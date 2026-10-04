@@ -166,5 +166,13 @@ document.getElementById('next-month').addEventListener('click', () => {
   renderCalendar();
 });
 
+// ⑦ データリセット処理
+document.getElementById('reset-btn').addEventListener('click', () => {
+  // 確認メッセージを出し、「OK」が押された時だけ実行
+  if (confirm('すべての記録を完全に削除しますか？この操作は取り消せません。')) {
+    localStorage.removeItem('myJournals'); // データを削除
+    location.reload(); // 画面を自動で再読み込みして初期化
+  }
+});
 // アプリ起動
 loadJournals();
