@@ -1,13 +1,96 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>課題Webアプリ</title>
+  <meta charset="UTF-8">
+  <!-- スマホでの見え方を最適化する設定 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お手軽ジャーナリング</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Supabase JS SDK (CDN経由) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <h1>課題アプリ稼働中</h1>
-    <script>
-        console.log("フロントエンドJavaScriptが実行されています");
-    </script>
+  <main class="container">
+    <header>
+      <h1>お手軽ジャーナリング</h1>
+      <p class="subtitle">1行で端的に記述しよう！</p>
+    </header>
+
+    <!-- 入力フォーム -->
+    <form id="journal-form" class="journal-form">
+      <!-- 属性選択ボタン -->
+      <div class="attribute-selector">
+        <input type="radio" id="attr-tobe" name="attribute" value="To-be" checked>
+        <label for="attr-tobe">To-be</label>
+
+        <input type="radio" id="attr-todo" name="attribute" value="To-do">
+        <label for="attr-todo">To-do</label>
+
+        <input type="radio" id="attr-free" name="attribute" value="自由欄">
+        <label for="attr-free">自由欄</label>
+      </div>
+
+      <div class="input-group">
+        <input type="text" id="journal-input" placeholder="一言入力..." required autocomplete="off">
+        <button type="submit" class="submit-btn">記録する</button>
+      </div>
+    </form>
+<!-- (前略: 入力フォームの部分) -->
+    </form>
+
+    <!-- ▼▼ ここから追加: カレンダーセクション ▼▼ -->
+    <section class="calendar-section">
+      <!-- カレンダー上部の月切り替え -->
+      <div class="calendar-header">
+        <button id="prev-month" class="nav-btn">&lt;</button>
+        <h2 id="current-month-year">2026年 10月</h2>
+        <button id="next-month" class="nav-btn">&gt;</button>
+      </div>
+
+      <!-- 曜日の表示 -->
+      <div class="calendar-weekdays">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+
+      <!-- 日付のマス目 (今回は見た目確認用のダミーデータを入れています) -->
+      <div id="calendar-grid" class="calendar-grid">
+        <!-- 1日の前の空白 -->
+        <div class="calendar-day empty"></div>
+        <div class="calendar-day empty"></div>
+        <div class="calendar-day empty"></div>
+        <div class="calendar-day empty"></div>
+        
+        <!-- 日付 -->
+        <div class="calendar-day">1</div>
+        <div class="calendar-day">2</div>
+        <div class="calendar-day has-record">3</div> <!-- 記録がある日のデザイン -->
+        <div class="calendar-day has-record selected">4</div> <!-- 記録があり、現在選択されている日のデザイン -->
+        <div class="calendar-day">5</div>
+        <div class="calendar-day">6</div>
+        <div class="calendar-day">7</div>
+        <div class="calendar-day has-record">8</div>
+        <div class="calendar-day">9</div>
+        <div class="calendar-day">10</div>
+        <!-- (以下略。実際はJavaScriptで自動生成します) -->
+      </div>
+    </section>
+    <!-- ▲▲ ここまで追加 ▲▲ -->
+
+    <!-- (後略: 過去の記録を表示するエリア) -->
+    <!-- 過去の記録を表示するエリア -->
+    <section class="journal-logs">
+      <!-- 属性で絞り込むタブ -->
+      <div class="list-tabs" id="list-tabs">
+        <button class="tab-btn active" data-filter="all">すべて</button>
+        <button class="tab-btn" data-filter="To-be">To-be</button>
+        <button class="tab-btn" data-filter="To-do">To-do</button>
+        <button class="tab-btn" data-filter="自由欄">自由欄</button>
+      </div>
+      
+      <ul id="journal-list" class="journal-list"></ul>
+    </section>
+  </main>
+  
+  <script src="app.js"></script>
 </body>
 </html>
