@@ -312,3 +312,20 @@ input[type="text"]:focus {
 .journal-list li {
   align-items: flex-start; /* バッジを左上に配置 */
 }
+
+/* リセットボタン */
+.reset-btn {
+  display: block;
+  width: 100%;
+  margin-top: 32px;
+  padding: 12px;
+  background-color: transparent;
+  color: #ff5252;
+  border: 1px solid #ff5252;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.reset-btn:hover {
+  background-color: #ffebee;
+}
