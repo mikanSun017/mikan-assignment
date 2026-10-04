@@ -23,11 +23,7 @@ function loadJournals() {
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     
-    journalData = [
-      { content: "スマホを見る代わりに書き出した", attribute: "自由欄", created_at: `${year}-${month}-01T10:00:00Z` },
-      { content: "落ち着いて行動できる自分になる", attribute: "To-be", created_at: now.toISOString() },
-      { content: "帰りの電車で本を10ページ読む", attribute: "To-do", created_at: now.toISOString() }
-    ];
+    journalData = [];
     saveJournals();
   }
 
