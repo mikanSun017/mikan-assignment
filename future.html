@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>バレットジャーナル - Future Log</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kurenaido&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="notebook-container">
+    
+    <!-- 目次風のサイドインデックス（リンクとして機能します） -->
+    <nav class="index-tabs">
+      <a href="future.html" class="tab-btn future-log active">Future</a>
+      <a href="index.html" class="tab-btn monthly-log ">Monthly</a>
+      <a href="daily.html" class="tab-btn daily-log ">Daily</a>
+      <a href="custom.html" class="tab-btn custom-log ">Custom</a>
+    </nav>
+
+<!-- ノートの中身 -->
+    <main class="page-content">
+      <h2 style="font-size: 1.8rem; margin-bottom: 20px;">Future Log</h2>
+      
+      <!-- ▼ Future Log用 入力フォーム ▼ -->
+      <form id="future-form" class="journal-form">
+        <div class="input-group">
+          <!-- 月を選択するプルダウン -->
+          <select id="future-month-select" class="month-select"></select>
+          
+          <input type="text" id="future-input" placeholder="未来の予定や目標を入力..." required autocomplete="off">
+          <button type="submit" class="submit-btn future-btn">追加</button>
+        </div>
+      </form>
+
+      <!-- ▼ 6ヶ月分の枠を表示するエリア ▼ -->
+      <div id="future-grid" class="future-grid">
+        <!-- JavaScriptで自動生成されます -->
+      </div>
+      
+    </main>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
