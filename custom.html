@@ -8,26 +8,101 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Kurenaido&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Custom Log専用のスタイル調整 */
+    .canvas-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .drawing-tools {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+      background: rgba(255, 255, 255, 0.6);
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 1px solid var(--line-color);
+    }
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .canvas-wrapper {
+      position: relative;
+      background-color: #ffffff;
+      border: 1px solid var(--line-color);
+      border-radius: 8px;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.02);
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    #drawing-canvas {
+      display: block;
+      touch-action: none; /* スマホでスクロールせずに描画できるようにする */
+      width: 100%;
+      height: 450px;
+    }
+    .canvas-btn {
+      font-family: 'Zen Kurenaido', sans-serif;
+      font-size: 1rem;
+      padding: 5px 15px;
+      border: 1px solid var(--text-color);
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .canvas-btn:hover {
+      background: var(--text-color);
+      color: var(--page-color);
+    }
+    .canvas-btn.active-tool {
+      background: var(--color-custom);
+      border-color: var(--color-custom);
+      color: #333;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
   <div class="notebook-container">
     
-    <!-- 目次風のサイドインデックス（リンクとして機能します） -->
+    <!-- 目次風のサイドインデックス -->
     <nav class="index-tabs">
-      <a href="future.html" class="tab-btn future-log ">Future</a>
-      <a href="index.html" class="tab-btn monthly-log ">Monthly</a>
-      <a href="daily.html" class="tab-btn daily-log ">Daily</a>
+      <a href="future.html" class="tab-btn future-log">Future</a>
+      <a href="index.html" class="tab-btn monthly-log">Monthly</a>
+      <a href="daily.html" class="tab-btn daily-log">Daily</a>
       <a href="custom.html" class="tab-btn custom-log active">Custom</a>
     </nav>
 
     <!-- ノートの中身 -->
     <main class="page-content">
+      <h2 style="font-size: 1.8rem; margin-bottom: 10px;">Custom Log (お絵描き帳)</h2>
       
-      <h2 style="font-size: 1.8rem; margin-bottom: 20px;">Custom Log</h2>
-      <p style="font-size: 1.2rem; color: #666; line-height: 2;">
-        Custom Logのページです。<br>
-        習慣トラッカーや読書記録など、自由に使えるページです。
-      </p>
+      <div class="canvas-container">
+        <!-- ツールバー -->
+        <div class="drawing-tools">
+          <div class="tool-group">
+            <label>色:</label>
+            <input type="color" id="pen-color" value="#4a4a4a" class="color-picker" style="width:32px; height:32px;">
+          </div>
+          <div class="tool-group">
+            <label>太さ:</label>
+            <input type="range" id="pen-width" min="1" max="20" value="3" style="cursor:pointer;">
+          </div>
+          <button id="eraser-btn" class="canvas-btn">消しゴム</button>
+          <button id="clear-btn" class="canvas-btn" style="margin-left: auto; border-color: #df6853; color: #df6853;">全消去</button>
+        </div>
+
+        <!-- キャンバス本体 -->
+        <div class="canvas-wrapper">
+          <canvas id="drawing-canvas"></canvas>
+        </div>
+      </div>
 
     </main>
 
