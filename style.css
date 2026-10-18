@@ -643,3 +643,145 @@ body {
 .monthly-goals-list li.task-item::before {
   content: none; /* 箇条書きの＊マークを消す */
 }
+
+/* ============================
+   削除ボタン（×マーク）のデザイン
+============================ */
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: #ccc;
+  font-size: 1.4rem;
+  font-family: sans-serif;
+  cursor: pointer;
+  margin-left: auto; /* 右端に寄せる */
+  padding: 0 5px;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+.delete-btn:hover {
+  color: #df6853; /* ホバー時に赤くする */
+}
+
+/* Daily LogのリストアイテムをFlexboxにして右端にボタンを置く */
+#journal-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap; /* スマホなどで折り返すため */
+}
+
+/* 記録の内容（テキスト）が伸びるようにする */
+.journal-content {
+  flex-grow: 1;
+}
+
+/* Future Logのリストアイテム */
+.future-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ============================
+   Daily Log 日付切り替えUI
+============================ */
+.daily-date-selector {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 15px 0;
+  padding: 10px;
+  background-color: #fcfcfc;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.daily-date-selector button {
+  background: transparent;
+  border: 1px solid #ccc;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #666;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.daily-date-selector button:hover {
+  background-color: #eee;
+}
+
+.daily-date-selector h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #555;
+  font-weight: normal;
+}
+
+/* ============================
+   Future Log カラーピッカーと色玉
+============================ */
+/* アイコンとカラー入力を含めるボタン風の枠 */
+.color-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background-color: #f8f8f8;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.color-select-wrapper:hover {
+  background-color: #eaeaea;
+}
+
+.color-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* カラーピッカー本体（丸くして親しみやすく） */
+.color-picker {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  background-color: transparent;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-picker::-webkit-color-swatch {
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #ccc;
+}
+
+.color-picker::-moz-color-swatch {
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #ccc;
+}
+
+/* Future Logリストの横に表示する色玉 */
+.color-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.1); /* 少し枠線をつけて見やすく */
+}
