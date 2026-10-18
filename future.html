@@ -29,7 +29,10 @@
         <div class="input-group">
           <!-- 月を選択するプルダウン -->
           <select id="future-month-select" class="month-select"></select>
-          
+          <label class="color-select-wrapper" title="予定の色を選ぶ">
+          <span class="color-icon"></span>
+          <input type="color" id="future-color-input" value="#9b59b6" class="color-picker">
+        </label>
           <input type="text" id="future-input" placeholder="未来の予定や目標を入力..." required autocomplete="off">
           <button type="submit" class="submit-btn future-btn">追加</button>
         </div>
