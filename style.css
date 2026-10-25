@@ -1,4 +1,4 @@
-:root {
+:root { 
   --bg-color: #f7f7f7;
   --page-color: #faf9f5;
   --text-color: #4a4a4a;
@@ -784,4 +784,80 @@ body {
   margin-right: 8px;
   flex-shrink: 0;
   border: 1px solid rgba(0,0,0,0.1); /* 少し枠線をつけて見やすく */
+}
+
+/* ============================
+   SPAビュー切り替え用スタイル
+============================ */
+.view-section {
+  display: none; /* 基本は非表示 */
+  width: 100%;
+  height: 100%;
+}
+
+/* activeクラスがついたビューだけを表示（見開きレイアウトを維持） */
+.view-section.active {
+  display: flex; 
+}
+
+/* ==========================================
+   ステップ3: ドロワー（引き出し）UI用スタイル
+   ========================================== */
+.drawer-panel {
+  position: fixed;
+  top: 0;
+  right: -550px; /* 初期状態は画面外（右）に隠す */
+  width: 100%;
+  max-width: 500px;
+  height: 100vh;
+  background-color: var(--page-color);
+  box-shadow: -10px 0 30px rgba(0,0,0,0.15);
+  border-left: 1px solid var(--line-color);
+  transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  padding: 40px 25px 30px 25px;
+  overflow-y: auto;
+  display: block !important; /* 既存のSPA用display:noneを上書き */
+}
+
+/* クラスが付与されたら画面内にスライド */
+.drawer-panel.open {
+  right: 0;
+}
+
+/* 背景の暗転 */
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.drawer-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 閉じるボタン */
+.close-drawer-btn {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  background: transparent;
+  border: none;
+  font-size: 2rem;
+  color: #aaa;
+  cursor: pointer;
+  transition: color 0.2s;
+  font-family: 'Zen Kurenaido', sans-serif;
+}
+.close-drawer-btn:hover {
+  color: var(--text-color);
 }
