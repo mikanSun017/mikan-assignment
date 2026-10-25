@@ -3,50 +3,429 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>バレットジャーナル - Monthly Log</title>
+  <title>バレットジャーナル (統合版)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Kurenaido&display=swap" rel="stylesheet">
+  
+  <!-- 外部CSSの読み込み (style.css) -->
   <link rel="stylesheet" href="style.css">
+  
+  <style>
+    /* ==========================================
+       1. 基本・変数設定 (Monthly専用の変数含む)
+       ========================================== */
+    :root {
+      --bg-color: #f7f7f7;
+      --page-color: #faf9f5;
+      --text-color: #333333;
+      --line-color: #e0dcd3;
+      --grid-line-color: rgba(210, 205, 195, 0.45);
+      
+      --color-future: #8cb86d;
+      --color-monthly: #8769db;
+      --color-daily: #c86b5e;
+      --color-custom: #eebb40;
+      
+      --font-journal: 'Zen Kurenaido', sans-serif;
+      --row-height: 32px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: var(--font-journal);
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px 10px;
+    }
+
+    /* ==========================================
+       SPA (単一ページ) ビュー切り替え用スタイル
+       ========================================== */
+    .view-section {
+      display: none !important;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    .view-section.active.notebook-spread {
+      display: flex !important; /* Monthlyは見開きFlexレイアウト */
+    }
+    .view-section.active.page-content {
+      display: block !important; /* 他のログは通常ブロック */
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ==========================================
+       2. メインノート構造 & 見開きレイアウト (Monthly)
+       ========================================== */
+    .notebook-container {
+      display: flex;
+      position: relative;
+      width: 100%;
+      max-width: 1280px;
+      margin-left: 50px;
+    }
+
+    .notebook-spread {
+      width: 100%;
+      background-color: var(--page-color);
+      border-radius: 6px 16px 16px 6px;
+      box-shadow: -5px 0 10px rgba(0,0,0,0.04), 0 12px 35px rgba(0,0,0,0.12);
+      border: 1px solid #dcdcdc;
+      position: relative;
+      background-image: 
+        linear-gradient(to right, var(--grid-line-color) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-line-color) 1px, transparent 1px);
+      background-size: 16px 16px;
+      min-height: 800px;
+    }
+
+    .spine-divider {
+      width: 16px;
+      background: linear-gradient(to right, rgba(0,0,0,0.06), rgba(0,0,0,0.01) 30%, rgba(0,0,0,0.01) 70%, rgba(0,0,0,0.06));
+      border-left: 1px solid rgba(0,0,0,0.06);
+      border-right: 1px solid rgba(0,0,0,0.06);
+      flex-shrink: 0;
+    }
+
+    .page-left, .page-right {
+      flex: 1;
+      padding: 25px 20px 30px 20px;
+      display: flex;
+      flex-direction: column;
+      overflow-x: auto;
+    }
+
+    /* Monthly 左ページ: Header */
+    .month-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px; padding-bottom: 8px; border-bottom: 2px solid var(--text-color);
+    }
+    .month-title-group { display: flex; align-items: baseline; gap: 15px; }
+    .month-title-en { font-size: 2rem; font-weight: bold; letter-spacing: 6px; text-transform: uppercase; }
+    .month-title-jp { font-size: 1.2rem; color: #666; }
+    .nav-btn {
+      background: transparent; border: 1px solid var(--text-color); border-radius: 4px;
+      padding: 2px 10px; font-family: var(--font-journal); font-size: 1.2rem; cursor: pointer;
+    }
+    .nav-btn:hover { background-color: rgba(0,0,0,0.08); }
+
+    /* Monthly 左ページ: 日付ログ＆習慣トラッカー */
+    .left-grid-container { display: flex; border-top: 1px solid var(--text-color); border-bottom: 1px solid var(--text-color); background: rgba(255, 255, 255, 0.5); }
+    .date-log-section { flex: 1; min-width: 240px; border-right: 2px solid var(--text-color); }
+    .grid-header-row { height: 40px; display: flex; align-items: center; border-bottom: 2px solid var(--text-color); font-weight: bold; font-size: 0.95rem; background: rgba(230, 225, 215, 0.4); }
+    .date-col-head { width: 50px; text-align: center; border-right: 1px solid var(--line-color); }
+    .log-col-head { padding-left: 10px; flex: 1; }
+    .date-log-row { height: var(--row-height); display: flex; align-items: center; border-bottom: 1px solid var(--line-color); }
+    .date-log-row:hover { background-color: rgba(255, 255, 240, 0.8); }
+    .date-cell { width: 50px; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 1rem; font-weight: bold; border-right: 1px solid var(--line-color); cursor: pointer; user-select: none; }
+    .date-cell:hover { background-color: rgba(200, 107, 94, 0.15); }
+    .day-num { width: 18px; text-align: right; }
+    .day-sun { color: #d9534f; } .day-sat { color: #337ab7; }
+    .log-input { flex: 1; height: 100%; border: none; background: transparent; padding: 0 8px; font-family: var(--font-journal); font-size: 1.05rem; color: var(--text-color); outline: none; }
+    .log-input:focus { background: #ffffff; box-shadow: inset 0 0 3px rgba(0,0,0,0.1); }
+    
+    .habit-tracker-section { display: flex; flex-direction: column; }
+    .habit-header-row { height: 40px; display: flex; border-bottom: 2px solid var(--text-color); background: rgba(230, 225, 215, 0.4); }
+    .habit-col-header { width: 32px; display: flex; align-items: center; justify-content: center; border-right: 1px solid var(--line-color); font-size: 0.75rem; writing-mode: vertical-rl; letter-spacing: 1px; padding: 2px 0; cursor: pointer; }
+    .habit-col-header:hover { background: rgba(0,0,0,0.05); }
+    .habit-add-btn { width: 30px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; font-size: 1.2rem; font-weight: bold; cursor: pointer; color: var(--color-monthly); }
+    .habit-row { height: var(--row-height); display: flex; border-bottom: 1px solid var(--line-color); }
+    .habit-cell { width: 32px; height: 100%; border-right: 1px solid var(--line-color); cursor: pointer; display: flex; align-items: center; justify-content: center; user-select: none; }
+    .habit-cell:hover { background-color: rgba(0,0,0,0.05); }
+    .habit-cell.filled { background-color: #2b2b2b; background-image: repeating-linear-gradient(45deg, #111111, #111111 2px, #333333 2px, #333333 4px); }
+
+    /* Monthly 右ページ: グラフ＆タスク */
+    .right-page-split { display: flex; gap: 15px; height: 100%; }
+    .graph-section { display: flex; flex-direction: column; border-left: 1px solid var(--text-color); border-right: 2px solid var(--text-color); border-top: 1px solid var(--text-color); border-bottom: 1px solid var(--text-color); background: rgba(255, 255, 255, 0.5); position: relative; }
+    .graph-header-container { height: 40px; border-bottom: 2px solid var(--text-color); display: flex; flex-direction: column; justify-content: center; background: rgba(230, 225, 215, 0.4); }
+    .graph-axis-labels { display: flex; justify-content: space-between; padding: 0 8px; font-size: 0.75rem; font-weight: bold; }
+    .graph-axis-sub { display: flex; justify-content: space-between; padding: 0 8px; font-size: 0.7rem; color: #666; }
+    .graph-body { position: relative; width: 220px; }
+    .graph-bg-grid { display: flex; flex-direction: column; }
+    .graph-row { height: var(--row-height); display: flex; border-bottom: 1px solid var(--line-color); cursor: pointer; }
+    .graph-row:hover { background-color: rgba(230, 230, 250, 0.4); }
+    .graph-col-guide { flex: 1; border-right: 1px dashed var(--line-color); height: 100%; }
+    .graph-col-guide:last-child { border-right: none; }
+    .graph-svg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    .task-section { flex: 1; min-width: 200px; padding-left: 10px; display: flex; flex-direction: column; }
+    .task-title { font-size: 1.6rem; letter-spacing: 8px; text-align: center; margin-bottom: 15px; padding-bottom: 5px; border-bottom: 2px dashed var(--text-color); }
+    .task-add-form { display: flex; gap: 5px; margin-bottom: 15px; }
+    .task-input { flex: 1; border: none; border-bottom: 2px dashed var(--line-color); background: transparent; padding: 4px 8px; font-size: 1.1rem; outline: none; font-family: var(--font-journal);}
+    .task-input:focus { border-bottom-color: var(--color-monthly); }
+    .task-add-btn { background: var(--color-monthly); color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-family: var(--font-journal);}
+    .task-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .task-item { display: flex; align-items: center; gap: 10px; font-size: 1.15rem; padding-bottom: 6px; border-bottom: 1px dashed var(--line-color); }
+    .task-checkbox-box { width: 20px; height: 20px; border: 2px solid var(--text-color); border-radius: 2px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #ffffff; position: relative; }
+    .task-checkbox-box.status-1::after { content: ''; position: absolute; width: 100%; height: 100%; background: linear-gradient(135deg, var(--text-color) 50%, transparent 50%); }
+    .task-checkbox-box.status-2 { background: var(--text-color); }
+    .task-checkbox-box.status-2::after { content: '✓'; color: #ffffff; font-size: 14px; font-weight: bold; }
+    .task-text { flex: 1; }
+    .task-text.completed { text-decoration: line-through; color: #999; }
+    .task-del-btn { background: transparent; border: none; color: #ccc; font-size: 1.2rem; cursor: pointer; }
+    .task-del-btn:hover { color: #d9534f; }
+
+    /* ==========================================
+       モーダル (グラフデータ入力用)
+       ========================================== */
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-backdrop.show { opacity: 1; pointer-events: auto; }
+    .modal-card { background: var(--page-color); padding: 20px 25px; border-radius: 8px; border: 2px solid var(--text-color); box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 290px; }
+    .modal-title { font-size: 1.3rem; margin-bottom: 15px; text-align: center; border-bottom: 1px dashed var(--line-color); padding-bottom: 5px; }
+    .modal-field { margin-bottom: 15px; }
+    .modal-field label { display: block; font-size: 1rem; margin-bottom: 5px; }
+    .modal-field select { width: 100%; padding: 6px; font-family: var(--font-journal); font-size: 1.05rem; border: 1px solid var(--text-color); border-radius: 4px; background: #fff; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-btn { font-family: var(--font-journal); font-size: 1rem; padding: 5px 15px; border-radius: 4px; border: 1px solid var(--text-color); cursor: pointer; }
+    .modal-btn.primary { background: var(--color-monthly); color: white; border-color: var(--color-monthly); }
+
+    /* ==========================================
+       Custom Log (お絵描き) 専用スタイル
+       ========================================== */
+    .canvas-container { display: flex; flex-direction: column; gap: 15px; margin-top: 15px; }
+    .drawing-tools { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; background: rgba(255, 255, 255, 0.6); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--line-color); }
+    .tool-group { display: flex; align-items: center; gap: 5px; }
+    .canvas-wrapper { position: relative; background-color: #ffffff; border: 1px solid var(--line-color); border-radius: 8px; box-shadow: inset 0 0 10px rgba(0,0,0,0.02); overflow: hidden; cursor: crosshair; }
+    #drawing-canvas { display: block; touch-action: none; width: 100%; height: 450px; }
+    .canvas-btn { font-family: 'Zen Kurenaido', sans-serif; font-size: 1rem; padding: 5px 15px; border: 1px solid var(--text-color); background: transparent; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+    .canvas-btn:hover { background: var(--text-color); color: var(--page-color); }
+    .canvas-btn.active-tool { background: var(--color-custom); border-color: var(--color-custom); color: #333; font-weight: bold; }
+
+    /* レスポンシブ (Monthly) */
+    @media (max-width: 992px) {
+      body { padding: 10px 5px; }
+      .notebook-container { margin-left: 0; flex-direction: column; }
+      .index-tabs { position: relative; left: 0; top: 0; flex-direction: row; justify-content: center; width: 100%; margin-bottom: 15px; gap: 6px; }
+      .tab-btn { width: auto !important; transform: none !important; border-radius: 6px; font-size: 0.95rem; padding: 6px 14px; text-align: center; }
+      .notebook-spread { flex-direction: column; border-radius: 12px; }
+      .spine-divider { height: 12px; width: 100%; border-top: 1px solid rgba(0,0,0,0.06); border-bottom: 1px solid rgba(0,0,0,0.06); }
+      .page-left, .page-right { padding: 15px 10px; }
+      .right-page-split { flex-direction: column; }
+      .graph-body { width: 100%; }
+    }
+  </style>
 </head>
 <body>
+
   <div class="notebook-container">
     
-    <!-- 目次風のサイドインデックス（リンクとして機能します） -->
+    <!-- サイドインデックス（SPAナビゲーション） -->
     <nav class="index-tabs">
-      <a href="future.html" class="tab-btn future-log ">Future</a>
-      <a href="index.html" class="tab-btn monthly-log active">Monthly</a>
-      <a href="daily.html" class="tab-btn daily-log ">Daily</a>
-      <a href="custom.html" class="tab-btn custom-log ">Custom</a>
+      <a href="#" class="tab-btn future-log" data-target="view-future">Future</a>
+      <a href="#" class="tab-btn monthly-log active" data-target="view-monthly">Monthly</a>
+      <a href="#" class="tab-btn daily-log" data-target="view-daily">Daily</a>
+      <a href="#" class="tab-btn custom-log" data-target="view-custom">Custom</a>
     </nav>
 
-    <!-- ノートの中身 -->
-    <main class="page-content">
+    <!-- =====================================
+         1. Monthly Log ビュー (メイン)
+         ===================================== -->
+    <div id="view-monthly" class="view-section notebook-spread active">
+      <!-- 【左ページ】 -->
+      <div class="page-left">
+        <div class="month-header">
+          <button id="prev-month-btn" class="nav-btn">&lt;</button>
+          <div class="month-title-group">
+            <span id="month-title-en" class="month-title-en"></span>
+            <span id="month-title-jp" class="month-title-jp"></span>
+          </div>
+          <button id="next-month-btn" class="nav-btn">&gt;</button>
+        </div>
+        <div class="left-grid-container">
+          <!-- 日付ログ -->
+          <div class="date-log-section">
+            <div class="grid-header-row">
+              <div class="date-col-head">日付</div>
+              <div class="log-col-head">ログ / メイン予定</div>
+            </div>
+            <div id="date-log-rows-container"></div>
+          </div>
+          <!-- 習慣トラッカー -->
+          <div class="habit-tracker-section">
+            <div class="habit-header-row" id="habit-header-row"></div>
+            <div id="habit-rows-container"></div>
+          </div>
+        </div>
+      </div>
+      <!-- 中央 -->
+      <div class="spine-divider"></div>
+      <!-- 【右ページ】 -->
+      <div class="page-right">
+        <div class="right-page-split">
+          <!-- 折れ線グラフ -->
+          <div class="graph-section">
+            <div class="graph-header-container">
+              <div class="graph-axis-labels">
+                <span style="color: #2b2b2b;">MOOD (-2 〜 +2) ●</span>
+                <span style="color: #2b6cb0;">● SLEEP (4 〜 8h)</span>
+              </div>
+              <div class="graph-axis-sub">
+                <span>-2 / 4h</span><span>0 / 6h</span><span>+2 / 8h</span>
+              </div>
+            </div>
+            <div class="graph-body" id="graph-body">
+              <div class="graph-bg-grid" id="graph-bg-grid"></div>
+              <svg class="graph-svg-overlay" id="graph-svg"></svg>
+            </div>
+          </div>
+          <!-- TASKリスト -->
+          <div class="task-section">
+            <h3 class="task-title">T A S K</h3>
+            <form id="task-form" class="task-add-form">
+              <input type="text" id="task-input" class="task-input" placeholder="タスクを入力..." required autocomplete="off">
+              <button type="submit" class="task-add-btn">追加</button>
+            </form>
+            <ul id="task-list" class="task-list"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =====================================
+         2. Future Log (ドロワー)
+         ===================================== -->
+    <main id="view-future" class="drawer-panel">
+      <button class="close-drawer-btn">×</button>
+      <h2 style="font-size: 1.8rem; margin-bottom: 20px;">Future Log</h2>
       
-      <div class="calendar-header">
-        <button id="prev-month" class="nav-btn">&lt;</button>
-        <h2 id="current-month-year">2026年 10月</h2>
-        <button id="next-month" class="nav-btn">&gt;</button>
-      </div>
-      <div class="calendar-weekdays">
-        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
-      </div>
-      <!-- 既存のカレンダーグリッド -->
-      <div id="calendar-grid" class="calendar-grid"></div>
-
-
-      <!-- ▼ ここから追加：今月の予定（Future Log連携）エリア ▼ -->
-      <div class="monthly-goals-container">
-        <h3 class="monthly-goals-title">今月の予定・目標</h3>
-        <ul id="monthly-goals-list" class="monthly-goals-list"></ul>
-      </div>
-      <!-- ▲ ここまで追加 ▲ -->
-      <!-- ▲ ここまで ▲ -->
-
+      <!-- 追記: Future Log のフォーム -->
+      <form id="future-form" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <select id="future-month-select" class="month-select"></select>
+        <div class="color-select-wrapper">
+          <input type="color" id="future-color-input" class="color-picker" value="#9b59b6">
+        </div>
+        <input type="text" id="future-input" class="task-input" placeholder="予定を入力..." required style="flex: 1;">
+        <button type="submit" class="submit-btn future-btn">追加</button>
+      </form>
+      
+      <!-- 追記: Future Log のグリッド -->
+      <div id="future-grid" class="future-grid"></div>
     </main>
 
+    <!-- =====================================
+         3. Daily Log (ドロワー)
+         ===================================== -->
+    <main id="view-daily" class="drawer-panel">
+      <button class="close-drawer-btn">×</button>
+      <h2 style="font-size: 1.8rem; margin-bottom: 20px;">Daily Log</h2>
+      
+      <!-- 追記: Daily Log の日付操作とフォーム -->
+      <div class="daily-date-selector">
+        <button id="prev-daily-btn">&lt; 前日</button>
+        <h3 id="current-daily-date"></h3>
+        <button id="next-daily-btn">翌日 &gt;</button>
+      </div>
+
+      <form id="journal-form" class="journal-form">
+        <div class="attribute-selector">
+          <input type="radio" id="attr-free" name="attribute" value="Free" checked>
+          <label for="attr-free">メモ・自由</label>
+          <input type="radio" id="attr-todo" name="attribute" value="To-do">
+          <label for="attr-todo">To-do</label>
+          <input type="radio" id="attr-tobe" name="attribute" value="To-be">
+          <label for="attr-tobe">To-be</label>
+        </div>
+        <div class="input-group">
+          <input type="text" id="journal-input" placeholder="出来事や気づきを記録..." autocomplete="off" required>
+          <button type="submit" class="submit-btn">記録</button>
+        </div>
+      </form>
+
+      <ul id="journal-list" class="journal-list"></ul>
+    </main>
+
+    <!-- =====================================
+         4. Custom Log (ドロワー)
+         ===================================== -->
+    <main id="view-custom" class="drawer-panel">
+      <button class="close-drawer-btn">×</button>
+      <h2 style="font-size: 1.8rem; margin-bottom: 10px;">Custom Log</h2>
+      
+      <div class="canvas-container">
+        <div class="drawing-tools" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;">
+          <div class="tool-group">
+            <label for="pen-color">Color:</label>
+            <input type="color" id="pen-color" value="#333333" class="color-picker">
+          </div>
+          <div class="tool-group">
+            <label for="pen-width">Size:</label>
+            <input type="range" id="pen-width" min="1" max="20" value="3">
+          </div>
+          <button id="eraser-btn" class="canvas-btn">消しゴム</button>
+          <button id="clear-btn" class="canvas-btn" style="color: #d9534f; border-color: #d9534f;">全消去</button>
+          
+          <!-- 追加: 保存用カテゴリと保存ボタン -->
+          <div style="margin-left: auto; display: flex; gap: 5px;">
+            <select id="canvas-category" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9rem;">
+              <option value="アイデア案">アイデア案</option>
+              <option value="落書き">落書き</option>
+              <option value="その他">その他</option>
+            </select>
+            <button id="save-canvas-btn" class="submit-btn" style="padding: 4px 12px; font-size: 0.9rem;">付箋として保存</button>
+          </div>
+        </div>
+        
+        <div class="canvas-wrapper">
+          <canvas id="drawing-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- 追加: 保存された付箋ギャラリー -->
+      <div id="custom-notes-gallery" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 30px; padding-top: 20px; border-top: 1px dashed #ccc;">
+        <!-- 保存した付箋がここに並びます -->
+      </div>
+    </main>
+
+  </div> <!-- /.notebook-container の閉じタグ -->
+
+  <!-- 追加: ドロワー展開時の背景暗転用オーバーレイ -->
+  <div class="drawer-overlay" id="drawer-overlay"></div>
+
+  <!-- =====================================
+       モーダル類 (Monthlyグラフ入力用)
+       ===================================== -->
+  <div class="modal-backdrop" id="graph-modal">
+    <div class="modal-card">
+      <h4 class="modal-title" id="modal-date-title"></h4>
+      <div class="modal-field">
+        <label for="mood-select">Mood (気分):</label>
+        <select id="mood-select">
+          <option value="">未設定</option>
+          <option value="-2">-2 (不調)</option>
+          <option value="-1">-1</option>
+          <option value="0">0 (普通)</option>
+          <option value="1">+1</option>
+          <option value="2">+2 (絶好調)</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label for="sleep-select">Sleep (睡眠時間):</label>
+        <select id="sleep-select">
+          <option value="">未設定</option>
+          <option value="4">4時間以下</option>
+          <option value="5">5時間</option>
+          <option value="6">6時間</option>
+          <option value="7">7時間</option>
+          <option value="8">8時間以上</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn" id="modal-cancel-btn">キャンセル</button>
+        <button type="button" class="modal-btn primary" id="modal-save-btn">保存</button>
+      </div>
+    </div>
   </div>
 
+  <!-- 統合版スクリプトの読み込み -->
   <script src="app.js"></script>
 </body>
 </html>
