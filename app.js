@@ -804,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
       window.switchView('view-daily');
     } else {
       window.switchView('view-monthly');
-    }
+    } 
   }
 
   initApp();
