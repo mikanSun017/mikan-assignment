@@ -1,6 +1,12 @@
 // ==========================================
-// デジタル・バレットジャーナル 統合版 app.js
+// デジタル・バレットジャーナル Supabase完全対応版
 // ==========================================
+
+// --- Supabase クライアント初期化 ---
+const SUPABASE_URL = 'https://bopkvfzuuftgekcjxgej.supabase.co'; // お使いのSupabase URL
+const SUPABASE_ANON_KEY = 'sb_publishable_bMr8qxjYHSke1KowDbkbYA_QAyTDC49'; // ※ご自身のanon/publicキーを入力してください
+
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -13,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeBtns = document.querySelectorAll('.close-drawer-btn');
 
   function openDrawer(targetId) {
-    closeAllDrawers(); // 他が開いていたら閉じる
+    closeAllDrawers();
     document.getElementById(targetId).classList.add('open');
     overlay.classList.add('show');
   }
@@ -22,20 +28,18 @@ document.addEventListener('DOMContentLoaded', () => {
     drawers.forEach(drawer => drawer.classList.remove('open'));
     overlay.classList.remove('show');
     
-    // タブのアクティブ状態をMonthlyに戻す
     tabs.forEach(t => t.classList.remove('active'));
     const defaultTab = document.querySelector('[data-target="view-monthly"]');
     if (defaultTab) defaultTab.classList.add('active');
   }
 
-  // タブクリック時の動作
   tabs.forEach(tab => {
     tab.addEventListener('click', (e) => {
       e.preventDefault();
       const targetId = tab.getAttribute('data-target');
       
       if (targetId === 'view-monthly') {
-        closeAllDrawers(); // Monthlyを押した場合はドロワーを閉じるだけ
+        closeAllDrawers();
       } else {
         openDrawer(targetId);
         tabs.forEach(t => t.classList.remove('active'));
@@ -44,14 +48,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // オーバーレイや閉じるボタンを押した時にドロワーを閉じる
   overlay.addEventListener('click', closeAllDrawers);
   closeBtns.forEach(btn => btn.addEventListener('click', closeAllDrawers));
 
-  // ====== 画面切り替え関数の定義 ======
   window.switchView = function(targetId) {
     if (targetId === 'view-monthly') {
-      closeAllDrawers(); // Monthlyはドロワーを閉じるだけ
+      closeAllDrawers();
     } else {
       openDrawer(targetId);
       tabs.forEach(t => t.classList.remove('active'));
@@ -61,30 +63,59 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // ==========================================
-  // 1. 共通データ管理 (Local Storage)
+  // 1. 共通データ管理 (Supabase)
   // ==========================================
-  
-  // --- Daily & Future 用 ---
   let journalData = [];
-  function loadJournals() {
-    const storedData = localStorage.getItem('myJournals');
-    if (storedData) {
-      journalData = JSON.parse(storedData);
-    }
-    journalData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }
-  function saveJournals() { localStorage.setItem('myJournals', JSON.stringify(journalData)); }
-  loadJournals();
-
   let futureData = [];
-  function loadFutureLogs() {
-    const storedData = localStorage.getItem('myFutureLogs');
-    if (storedData) futureData = JSON.parse(storedData);
-  }
-  function saveFutureLogs() { localStorage.setItem('myFutureLogs', JSON.stringify(futureData)); }
-  loadFutureLogs();
+  let customNotesData = [];
 
-  // --- Monthly 用 ---
+  // --- Daily Log 通信 ---
+  async function loadJournals() {
+    const { data, error } = await supabaseClient
+      .from('journals')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('journals load error:', error);
+      return;
+    }
+    journalData = data || [];
+    renderJournalList();
+  }
+
+  // --- Future Log 通信 ---
+  async function loadFutureLogs() {
+    const { data, error } = await supabaseClient
+      .from('future_logs')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('future_logs load error:', error);
+      return;
+    }
+    futureData = data || [];
+    renderFutureGrid();
+    renderMonthlyLog(); // タスク連携更新
+  }
+
+  // --- Custom Log (付箋) 通信 ---
+  async function loadCustomNotes() {
+    const { data, error } = await supabaseClient
+      .from('custom_notes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('custom_notes load error:', error);
+      return;
+    }
+    customNotesData = data || [];
+    renderCustomNotes();
+  }
+
+  // --- Monthly Log 通信 ---
   let currentDate = new Date(); 
   const MONTH_NAMES_EN = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
   const DAY_NAMES_JA = ["S", "M", "T", "W", "T", "F", "S"];
@@ -95,71 +126,76 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${y}-${m}`;
   }
 
-  function loadLogTexts(key) { return JSON.parse(localStorage.getItem(`monthly_logs_${key}`)) || {}; }
-  function saveLogTexts(key, data) { localStorage.setItem(`monthly_logs_${key}`, JSON.stringify(data)); }
-  
-  function loadHabitItems(key) {
-    const saved = localStorage.getItem(`monthly_habit_items_${key}`);
-    return saved ? JSON.parse(saved) : [];
-  }
-  function saveHabitItems(key, items) { localStorage.setItem(`monthly_habit_items_${key}`, JSON.stringify(items)); }
-  
-  function loadHabitData(key) { return JSON.parse(localStorage.getItem(`monthly_habit_data_${key}`)) || {}; }
-  function saveHabitData(key, data) { localStorage.setItem(`monthly_habit_data_${key}`, JSON.stringify(data)); }
-  
-  function loadGraphData(key) { return JSON.parse(localStorage.getItem(`monthly_graph_data_${key}`)) || {}; }
-  function saveGraphData(key, data) { localStorage.setItem(`monthly_graph_data_${key}`, JSON.stringify(data)); }
-  
-  function loadTaskList(key) {
-    const saved = localStorage.getItem(`monthly_tasks_${key}`);
-    return saved ? JSON.parse(saved) : [{ id: 't1', text: '初期サンプルタスク', status: 0 }];
-  }
-  function saveTaskList(key, tasks) { localStorage.setItem(`monthly_tasks_${key}`, JSON.stringify(tasks)); }
+  async function loadMonthlyRecord(monthKey) {
+    const { data, error } = await supabaseClient
+      .from('monthly_data')
+      .select('*')
+      .eq('month_key', monthKey)
+      .maybeSingle();
 
+    if (error) console.error('monthly_data load error:', error);
+
+    return data || {
+      month_key: monthKey,
+      logs: {},
+      habit_items: [], // デフォルト空
+      habit_data: {},
+      graph_data: {},
+      tasks: [{ id: 't1', text: '初期サンプルタスク', status: 0 }]
+    };
+  }
+
+  async function updateMonthlyRecord(monthKey, payload) {
+    const { error } = await supabaseClient
+      .from('monthly_data')
+      .upsert({ month_key: monthKey, ...payload });
+
+    if (error) console.error('monthly_data save error:', error);
+  }
 
   // ==========================================
-  // 2. Monthly Log (月間カレンダー/習慣/グラフ)
+  // 2. Monthly Log
   // ==========================================
   let activeModalDay = null;
 
-  function renderMonthlyLog() {
+  async function renderMonthlyLog() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth(); 
     const monthKey = getMonthKey();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    // ヘッダー表示更新
     const titleEn = document.getElementById('month-title-en');
     const titleJp = document.getElementById('month-title-jp');
     if(titleEn) titleEn.textContent = MONTH_NAMES_EN[month];
     if(titleJp) titleJp.textContent = `${year}年 ${month + 1}月`;
 
-    const logTexts = loadLogTexts(monthKey);
-    const habitItems = loadHabitItems(monthKey);
-    const habitData = loadHabitData(monthKey);
-    const graphData = loadGraphData(monthKey);
-    const taskList = loadTaskList(monthKey);
+    const currentMonthly = await loadMonthlyRecord(monthKey);
+    const logTexts = currentMonthly.logs || {};
+    const habitItems = currentMonthly.habit_items || [];
+    const habitData = currentMonthly.habit_data || {};
+    const graphData = currentMonthly.graph_data || {};
+    const taskList = currentMonthly.tasks || [];
 
     const dateLogsContainer = document.getElementById('date-log-rows-container');
     const habitHeaderRow = document.getElementById('habit-header-row');
     const habitRowsContainer = document.getElementById('habit-rows-container');
     
-    if(!dateLogsContainer) return; // DOMがない場合はスキップ
+    if(!dateLogsContainer) return;
 
     dateLogsContainer.innerHTML = '';
     habitHeaderRow.innerHTML = '';
     habitRowsContainer.innerHTML = '';
 
-    // 習慣ヘッダー描画
+    // 習慣ヘッダー
     habitItems.forEach((item, habitIdx) => {
       const hDiv = document.createElement('div');
       hDiv.className = 'habit-col-header';
       hDiv.textContent = item;
       hDiv.title = 'クリックで項目を削除';
-      hDiv.addEventListener('click', () => {
+      hDiv.addEventListener('click', async () => {
         if (confirm(`習慣項目「${item}」を削除しますか？`)) {
           habitItems.splice(habitIdx, 1);
-          saveHabitItems(monthKey, habitItems);
+          await updateMonthlyRecord(monthKey, { habit_items: habitItems });
           renderMonthlyLog();
         }
       });
@@ -169,11 +205,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const addHBtn = document.createElement('button');
     addHBtn.className = 'habit-add-btn';
     addHBtn.textContent = '＋';
-    addHBtn.addEventListener('click', () => {
+    addHBtn.addEventListener('click', async () => {
       const name = prompt('追加する習慣名を入力してください:');
       if (name && name.trim()) {
         habitItems.push(name.trim());
-        saveHabitItems(monthKey, habitItems);
+        await updateMonthlyRecord(monthKey, { habit_items: habitItems });
         renderMonthlyLog();
       }
     });
@@ -194,15 +230,13 @@ document.addEventListener('DOMContentLoaded', () => {
       dateCell.className = `date-cell ${dayClass}`;
       dateCell.innerHTML = `<span class="day-num">${day}</span><span>${DAY_NAMES_JA[dayOfWeek]}</span>`;
       
-      // SPA用：日付クリックでDailyタブにシームレス遷移
       dateCell.title = 'この日の Daily Log を開く';
       dateCell.addEventListener('click', () => {
         const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        // Dailyの対象日付を更新
         if (typeof window.setDailyDate === 'function') {
           window.setDailyDate(new Date(formattedDate));
         }
-        window.switchView('view-daily'); // Dailyビューへ切り替え
+        window.switchView('view-daily');
       });
 
       const logInput = document.createElement('input');
@@ -210,9 +244,9 @@ document.addEventListener('DOMContentLoaded', () => {
       logInput.className = 'log-input';
       logInput.value = logTexts[day] || '';
       logInput.placeholder = '...';
-      logInput.addEventListener('change', (e) => {
+      logInput.addEventListener('change', async (e) => {
         logTexts[day] = e.target.value;
-        saveLogTexts(monthKey, logTexts);
+        await updateMonthlyRecord(monthKey, { logs: logTexts });
       });
 
       rowDiv.appendChild(dateCell);
@@ -227,10 +261,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const isFilled = habitData[day] && habitData[day][item];
         if (isFilled) cell.classList.add('filled');
 
-        cell.addEventListener('click', () => {
+        cell.addEventListener('click', async () => {
           if (!habitData[day]) habitData[day] = {};
           habitData[day][item] = !habitData[day][item];
-          saveHabitData(monthKey, habitData);
+          await updateMonthlyRecord(monthKey, { habit_data: habitData });
           cell.classList.toggle('filled');
         });
         hRowDiv.appendChild(cell);
@@ -238,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
       habitRowsContainer.appendChild(hRowDiv);
     }
 
-    // グラフBG生成
+    // グラフBG
     const graphBgGrid = document.getElementById('graph-bg-grid');
     graphBgGrid.innerHTML = '';
     for (let day = 1; day <= daysInMonth; day++) {
@@ -253,9 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
       graphBgGrid.appendChild(gRow);
     }
 
-    // グラフ描画
     setTimeout(() => renderGraphSVG(daysInMonth, graphData), 50);
-    // タスク描画
     renderTaskList(monthKey, taskList);
   }
 
@@ -289,7 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Mood (黒)
     if (moodPoints.length > 1) {
       const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       polyline.setAttribute('points', moodPoints.map(p => `${p.x},${p.y}`).join(' '));
@@ -305,7 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
       svg.appendChild(circle);
     });
 
-    // Sleep (青)
     if (sleepPoints.length > 1) {
       const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       polyline.setAttribute('points', sleepPoints.map(p => `${p.x},${p.y}`).join(' '));
@@ -328,8 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!ul) return;
     ul.innerHTML = '';
 
-    // Future Log 連携
-    const thisMonthFutures = futureData.filter(f => f.targetMonth === monthKey);
+    const thisMonthFutures = futureData.filter(f => f.target_month === monthKey);
     thisMonthFutures.forEach(f => {
       const li = document.createElement('li');
       li.className = 'task-item';
@@ -338,15 +367,14 @@ document.addEventListener('DOMContentLoaded', () => {
       ul.appendChild(li);
     });
 
-    // 通常タスク
     taskList.forEach((t, idx) => {
       const li = document.createElement('li');
       li.className = 'task-item';
       const box = document.createElement('div');
       box.className = `task-checkbox-box status-${t.status || 0}`;
-      box.addEventListener('click', () => {
+      box.addEventListener('click', async () => {
         t.status = ((t.status || 0) + 1) % 3;
-        saveTaskList(monthKey, taskList);
+        await updateMonthlyRecord(monthKey, { tasks: taskList });
         renderTaskList(monthKey, taskList);
       });
       const span = document.createElement('span');
@@ -355,9 +383,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const delBtn = document.createElement('button');
       delBtn.className = 'task-del-btn';
       delBtn.textContent = '×';
-      delBtn.addEventListener('click', () => {
+      delBtn.addEventListener('click', async () => {
         taskList.splice(idx, 1);
-        saveTaskList(monthKey, taskList);
+        await updateMonthlyRecord(monthKey, { tasks: taskList });
         renderTaskList(monthKey, taskList);
       });
       li.appendChild(box); li.appendChild(span); li.appendChild(delBtn);
@@ -365,17 +393,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Monthly イベントリスナー
   const taskForm = document.getElementById('task-form');
   if(taskForm) {
-    taskForm.addEventListener('submit', (e) => {
+    taskForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const input = document.getElementById('task-input');
       if (!input.value.trim()) return;
       const monthKey = getMonthKey();
-      const taskList = loadTaskList(monthKey);
+      const currentMonthly = await loadMonthlyRecord(monthKey);
+      const taskList = currentMonthly.tasks || [];
       taskList.push({ id: 't_' + Date.now(), text: input.value.trim(), status: 0 });
-      saveTaskList(monthKey, taskList);
+      await updateMonthlyRecord(monthKey, { tasks: taskList });
       input.value = '';
       renderTaskList(monthKey, taskList);
     });
@@ -386,7 +414,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if(prevMonthBtn) prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderMonthlyLog(); });
   if(nextMonthBtn) nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderMonthlyLog(); });
 
-  // グラフ用モーダル
   const modal = document.getElementById('graph-modal');
   const moodSelect = document.getElementById('mood-select');
   const sleepSelect = document.getElementById('sleep-select');
@@ -403,20 +430,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalSaveBtn = document.getElementById('modal-save-btn');
   if(modalCancelBtn) modalCancelBtn.addEventListener('click', () => modal.classList.remove('show'));
   if(modalSaveBtn) {
-    modalSaveBtn.addEventListener('click', () => {
+    modalSaveBtn.addEventListener('click', async () => {
       if (!activeModalDay) return;
       const monthKey = getMonthKey();
-      const graphData = loadGraphData(monthKey);
+      const currentMonthly = await loadMonthlyRecord(monthKey);
+      const graphData = currentMonthly.graph_data || {};
       graphData[activeModalDay] = { mood: moodSelect.value, sleep: sleepSelect.value };
-      saveGraphData(monthKey, graphData);
+      await updateMonthlyRecord(monthKey, { graph_data: graphData });
       modal.classList.remove('show');
       renderMonthlyLog();
     });
   }
 
-
   // ==========================================
-  // 3. Daily Log (日々の記録)
+  // 3. Daily Log
   // ==========================================
   const journalForm = document.getElementById('journal-form');
   const journalInput = document.getElementById('journal-input');
@@ -425,7 +452,6 @@ document.addEventListener('DOMContentLoaded', () => {
   
   let currentDailyDate = new Date();
   
-  // 外部(Monthly等)から日付を指定して更新するための関数
   window.setDailyDate = function(date) {
     currentDailyDate = date;
     renderJournalList();
@@ -465,38 +491,49 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (journalList) {
-    journalList.addEventListener('click', (e) => {
+    journalList.addEventListener('click', async (e) => {
       if (e.target.classList.contains('journal-delete')) {
         const id = e.target.getAttribute('data-id');
         if (confirm('この記録を削除してもよろしいですか？')) {
-          journalData = journalData.filter(item => item.id !== id);
-          saveJournals();
-          renderJournalList();
+          const { error } = await supabaseClient
+            .from('journals')
+            .delete()
+            .eq('id', id);
+
+          if (!error) {
+            journalData = journalData.filter(item => item.id !== id);
+            renderJournalList();
+          }
         }
       }
     });
   }
 
   if (journalForm) {
-    journalForm.addEventListener('submit', (e) => {
+    journalForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!journalInput.value.trim()) return;
       const selectedAttr = document.querySelector('input[name="attribute"]:checked').value;
       const saveDate = new Date(currentDailyDate);
       const now = new Date();
       saveDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-      const offset = saveDate.getTimezoneOffset() * 60000;
-      const localISOTime = (new Date(saveDate.getTime() - offset)).toISOString().slice(0, -1);
 
-      journalData.unshift({
+      const newJournal = {
         id: 'journal_' + Date.now(),
         content: journalInput.value.trim(),
         attribute: selectedAttr,
-        created_at: localISOTime
-      });
-      saveJournals();
-      journalInput.value = '';
-      renderJournalList();
+        created_at: saveDate.toISOString()
+      };
+
+      const { error } = await supabaseClient
+        .from('journals')
+        .insert([newJournal]);
+
+      if (!error) {
+        journalData.unshift(newJournal);
+        journalInput.value = '';
+        renderJournalList();
+      }
     });
   }
 
@@ -505,9 +542,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if(prevDailyBtn) prevDailyBtn.addEventListener('click', () => { currentDailyDate.setDate(currentDailyDate.getDate() - 1); renderJournalList(); });
   if(nextDailyBtn) nextDailyBtn.addEventListener('click', () => { currentDailyDate.setDate(currentDailyDate.getDate() + 1); renderJournalList(); });
 
-
   // ==========================================
-  // 4. Future Log (未来の予定)
+  // 4. Future Log
   // ==========================================
   const futureForm = document.getElementById('future-form');
   const futureSelect = document.getElementById('future-month-select');
@@ -518,7 +554,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderFutureGrid() {
     if(!futureGrid) return;
     
-    // Future用のセレクトボックス初期化(初回のみ)
     if(futureSelect && futureSelect.options.length === 0) {
       const ty = new Date().getFullYear();
       const tm = new Date().getMonth();
@@ -539,7 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const ul = document.createElement('ul');
       ul.className = 'future-list';
-      const monthData = futureData.filter(item => item.targetMonth === opt.value);
+      const monthData = futureData.filter(item => item.target_month === opt.value);
       
       if (monthData.length === 0) {
         ul.innerHTML = '<li class="empty-item" style="color:#999; font-size:1rem;">予定なし</li>';
@@ -562,51 +597,54 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (futureGrid) {
-    futureGrid.addEventListener('click', (e) => {
+    futureGrid.addEventListener('click', async (e) => {
       if (e.target.classList.contains('delete-btn')) {
         const id = e.target.getAttribute('data-id');
         if (confirm(`この予定を削除してもよろしいですか？`)) {
-          futureData = futureData.filter(f => f.id !== id);
-          saveFutureLogs();
-          renderFutureGrid();
-          renderMonthlyLog(); // タスクリスト連携のため更新
+          const { error } = await supabaseClient
+            .from('future_logs')
+            .delete()
+            .eq('id', id);
+
+          if (!error) {
+            futureData = futureData.filter(f => f.id !== id);
+            renderFutureGrid();
+            renderMonthlyLog();
+          }
         }
       }
     });
   }
 
   if (futureForm) {
-    futureForm.addEventListener('submit', (e) => {
+    futureForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!futureInput.value.trim()) return;
-      futureData.push({
+
+      const newFuture = {
         id: 'future_' + Date.now(),
-        targetMonth: futureSelect.value,
+        target_month: futureSelect.value,
         content: futureInput.value.trim(),
         color: futureColorInput ? futureColorInput.value : '#9b59b6',
         created_at: new Date().toISOString()
-      });
-      saveFutureLogs();
-      futureInput.value = '';
-      renderFutureGrid();
-      renderMonthlyLog(); // タスクリスト連携のため更新
+      };
+
+      const { error } = await supabaseClient
+        .from('future_logs')
+        .insert([newFuture]);
+
+      if (!error) {
+        futureData.push(newFuture);
+        futureInput.value = '';
+        renderFutureGrid();
+        renderMonthlyLog();
+      }
     });
   }
 
-
   // ==========================================
-  // 5. Custom Log (お絵描きキャンバスと付箋保存)
+  // 5. Custom Log
   // ==========================================
-  let customNotesData = [];
-  function loadCustomNotes() {
-    const stored = localStorage.getItem('myCustomNotes');
-    if (stored) customNotesData = JSON.parse(stored);
-  }
-  function saveCustomNotes() {
-    localStorage.setItem('myCustomNotes', JSON.stringify(customNotesData));
-  }
-  loadCustomNotes();
-
   const canvas = document.getElementById('drawing-canvas');
   const customNotesGallery = document.getElementById('custom-notes-gallery');
 
@@ -616,16 +654,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     customNotesData.forEach(note => {
       const card = document.createElement('div');
-      // 付箋風のデザイン
       card.style.cssText = "border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; background: #fff; width: 220px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 8px;";
       
       const dateObj = new Date(note.created_at);
       const dateStr = `${dateObj.getFullYear()}/${String(dateObj.getMonth()+1).padStart(2,'0')}/${String(dateObj.getDate()).padStart(2,'0')} ${String(dateObj.getHours()).padStart(2,'0')}:${String(dateObj.getMinutes()).padStart(2,'0')}`;
       
-      // カテゴリごとの色分け
       let badgeColor = "#eee";
-      if (note.category === 'アイデア案') badgeColor = "#ffeaa7"; // 黄色系
-      if (note.category === '落書き') badgeColor = "#81ecec"; // 水色系
+      if (note.category === 'アイデア案') badgeColor = "#ffeaa7";
+      if (note.category === '落書き') badgeColor = "#81ecec";
       
       card.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -639,15 +675,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ギャラリー内の削除ボタンイベント
   if (customNotesGallery) {
-    customNotesGallery.addEventListener('click', (e) => {
+    customNotesGallery.addEventListener('click', async (e) => {
       if (e.target.classList.contains('delete-note-btn')) {
         const id = e.target.getAttribute('data-id');
         if (confirm('この付箋を削除してもよろしいですか？')) {
-          customNotesData = customNotesData.filter(n => n.id !== id);
-          saveCustomNotes();
-          renderCustomNotes();
+          const { error } = await supabaseClient
+            .from('custom_notes')
+            .delete()
+            .eq('id', id);
+
+          if (!error) {
+            customNotesData = customNotesData.filter(n => n.id !== id);
+            renderCustomNotes();
+          }
         }
       }
     });
@@ -669,12 +710,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if(rect.width === 0 || rect.height === 0) return;
       canvas.width = rect.width;
       canvas.height = rect.height;
-      const dataURL = localStorage.getItem('customCanvasImage');
-      if (dataURL) {
-        const img = new Image();
-        img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        img.src = dataURL;
-      }
     };
 
     window.addEventListener('resize', window.resizeCanvas);
@@ -705,12 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lastX = currentX; lastY = currentY;
     }
 
-    function stopDrawing() {
-      if (isDrawing) {
-        isDrawing = false;
-        localStorage.setItem('customCanvasImage', canvas.toDataURL());
-      }
-    }
+    function stopDrawing() { isDrawing = false; }
 
     canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDrawing); canvas.addEventListener('mouseout', stopDrawing);
@@ -722,14 +752,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if(clearBtn) clearBtn.addEventListener('click', () => {
       if (confirm('キャンバスを全消去しますか？')) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        localStorage.removeItem('customCanvasImage');
       }
     });
     if(penColorInput) penColorInput.addEventListener('input', () => { isEraser = false; eraserBtn.classList.remove('active-tool'); });
 
-    // 保存ボタンの処理
     if(saveBtn) {
-      saveBtn.addEventListener('click', () => {
+      saveBtn.addEventListener('click', async () => {
         const dataURL = canvas.toDataURL();
         const newNote = {
           id: 'c_note_' + Date.now(),
@@ -737,43 +765,48 @@ document.addEventListener('DOMContentLoaded', () => {
           category: categorySelect ? categorySelect.value : 'その他',
           created_at: new Date().toISOString()
         };
-        customNotesData.unshift(newNote); // 最新のものを先頭に追加
-        saveCustomNotes();
-        renderCustomNotes();
-        
-        // 保存後にキャンバスをクリア
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        localStorage.removeItem('customCanvasImage');
+
+        const { error } = await supabaseClient
+          .from('custom_notes')
+          .insert([newNote]);
+
+        if (!error) {
+          customNotesData.unshift(newNote);
+          renderCustomNotes();
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
       });
     }
-  }
+  } 
 
   // ==========================================
-  // 初期化実行 (初回表示のセットアップ)
+  // 初期化実行 (初回データ読み込み)
   // ==========================================
   window.addEventListener('resize', () => {
     const monthKey = getMonthKey();
     const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-    renderGraphSVG(daysInMonth, loadGraphData(monthKey));
+    loadMonthlyRecord(monthKey).then(m => renderGraphSVG(daysInMonth, m.graph_data || {}));
   });
 
-  // 1. 各画面の初期描画を実行する（正しい関数名を呼び出す）
-  renderMonthlyLog();
-  renderFutureGrid();
-  renderJournalList();
-  renderCustomNotes();
-  if (typeof window.resizeCanvas === 'function') {
-    window.resizeCanvas();
+  async function initApp() {
+    await loadJournals();
+    await loadFutureLogs();
+    await loadCustomNotes();
+    await renderMonthlyLog();
+    if (typeof window.resizeCanvas === 'function') {
+      window.resizeCanvas();
+    }
+
+    const jumpDateStr = localStorage.getItem('jumpToDate');
+    if (jumpDateStr) {
+      window.setDailyDate(new Date(jumpDateStr));
+      localStorage.removeItem('jumpToDate');
+      window.switchView('view-daily');
+    } else {
+      window.switchView('view-monthly');
+    }
   }
 
-  // 2. 読み込み完了時にデフォルトで画面を表示
-  const jumpDateStr = localStorage.getItem('jumpToDate');
-  if (jumpDateStr) {
-    window.setDailyDate(new Date(jumpDateStr));
-    localStorage.removeItem('jumpToDate');
-    window.switchView('view-daily');
-  } else {
-    window.switchView('view-monthly');
-  }
+  initApp();
 
 });
