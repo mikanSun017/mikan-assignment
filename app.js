@@ -158,6 +158,24 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   let activeModalDay = null;
 
+  // 見出し行(日付ログ・習慣・グラフ)の高さを、習慣項目名の長さに合わせて調整する。
+  // 3つの見出しは共通のCSS変数 --head-h で高さを揃えているので、行がズレることはない。
+  // 長すぎる名前は HEAD_H_MAX を上限に「…」で省略される。
+  const HEAD_H_MIN = 40;
+  const HEAD_H_MAX = 100;
+  function fitHeaderHeight() {
+    const spread = document.getElementById('view-monthly');
+    if (!spread || spread.offsetParent === null) return;
+    spread.style.setProperty('--head-h', HEAD_H_MIN + 'px'); // いったん最小にして、名前本来の長さを測る
+    let need = 0;
+    spread.querySelectorAll('.habit-name').forEach(el => { need = Math.max(need, el.scrollHeight); });
+    // 名前の長さ + 上下の余白(4px×2) + 見出し下線(2px)
+    const h = need ? Math.min(HEAD_H_MAX, Math.max(HEAD_H_MIN, need + 10)) : HEAD_H_MIN;
+    spread.style.setProperty('--head-h', h + 'px');
+  }
+  // Webフォントの読み込み後は文字の長さが変わるので、測り直す
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeaderHeight);
+
   async function renderMonthlyLog() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth(); 
@@ -190,8 +208,11 @@ document.addEventListener('DOMContentLoaded', () => {
     habitItems.forEach((item, habitIdx) => {
       const hDiv = document.createElement('div');
       hDiv.className = 'habit-col-header';
-      hDiv.textContent = item;
-      hDiv.title = 'クリックで項目を削除';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'habit-name';
+      nameSpan.textContent = item;
+      hDiv.appendChild(nameSpan);
+      hDiv.title = `${item}（クリックで項目を削除）`;
       hDiv.addEventListener('click', async () => {
         if (confirm(`習慣項目「${item}」を削除しますか？`)) {
           habitItems.splice(habitIdx, 1);
@@ -214,6 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     habitHeaderRow.appendChild(addHBtn);
+    fitHeaderHeight();
 
     // 各日の行生成
     for (let day = 1; day <= daysInMonth; day++) {
@@ -373,12 +395,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const box = document.createElement('div');
       box.className = `task-checkbox-box status-${t.status || 0}`;
       box.addEventListener('click', async () => {
-        t.status = ((t.status || 0) + 1) % 3;
+        t.status = ((t.status || 0) + 1) % 4;
         await updateMonthlyRecord(monthKey, { tasks: taskList });
         renderTaskList(monthKey, taskList);
       });
       const span = document.createElement('span');
-      span.className = `task-text ${t.status === 2 ? 'completed' : ''}`;
+      span.className = `task-text ${t.status === 2 ? 'completed' : ''} ${t.status === 3 ? 'cancelled' : ''}`;
       span.textContent = t.text;
       const delBtn = document.createElement('button');
       delBtn.className = 'task-del-btn';
@@ -804,9 +826,196 @@ document.addEventListener('DOMContentLoaded', () => {
       window.switchView('view-daily');
     } else {
       window.switchView('view-monthly');
-    } 
+    }
+  }
+  // ==========================================
+  // 6. Timer Log (ストップウォッチ/タイマー/ポモドーロ)
+  // ==========================================
+  let currentTimerMode = 'stopwatch'; // 'stopwatch' | 'countdown' | 'pomodoro'
+  let timerInterval = null;
+  let timerSeconds = 0; // 秒単位で計測
+  let isTimerRunning = false;
+  let isPomodoroWorkState = true; // ポモドーロの作業時間中か否か
+
+  const timerDisplay = document.getElementById('timer-display');
+  const pomodoroStatus = document.getElementById('pomodoro-status');
+  const countdownInputs = document.getElementById('countdown-inputs');
+  const pomodoroInputs = document.getElementById('pomodoro-inputs');
+
+  const modeStopwatchBtn = document.getElementById('mode-stopwatch-btn');
+  const modeCountdownBtn = document.getElementById('mode-countdown-btn');
+  const modePomodoroBtn = document.getElementById('mode-pomodoro-btn');
+
+  const startBtn = document.getElementById('timer-start-btn');
+  const pauseBtn = document.getElementById('timer-pause-btn');
+  const resetBtn = document.getElementById('timer-reset-btn');
+
+  // アラーム音再生 (Web Audio API)
+  function playAlarmSound() {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 (880Hz)
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.8);
+    } catch(e) {
+      console.log('Audio error:', e);
+    }
   }
 
+  // 秒数を HH:MM:SS または MM:SS 表記にフォーマット
+  function formatTime(totalSeconds) {
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    if (hrs > 0) {
+      return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+
+  function updateTimerDisplay() {
+    if (timerDisplay) {
+      timerDisplay.textContent = formatTime(timerSeconds);
+    }
+  }
+
+  // モード切替処理
+  function switchTimerMode(mode) {
+    pauseTimer();
+    currentTimerMode = mode;
+
+    // ボタンの見た目制御
+    [modeStopwatchBtn, modeCountdownBtn, modePomodoroBtn].forEach(btn => {
+      if (btn) {
+        btn.style.background = '#eee';
+        btn.style.color = '#333';
+        btn.style.fontWeight = 'normal';
+      }
+    });
+
+    if (countdownInputs) countdownInputs.style.display = 'none';
+    if (pomodoroInputs) pomodoroInputs.style.display = 'none';
+    if (pomodoroStatus) pomodoroStatus.style.display = 'none';
+
+    if (mode === 'stopwatch') {
+      if (modeStopwatchBtn) { modeStopwatchBtn.style.background = '#4a90e2'; modeStopwatchBtn.style.color = '#fff'; modeStopwatchBtn.style.fontWeight = 'bold'; }
+      timerSeconds = 0;
+    } else if (mode === 'countdown') {
+      if (modeCountdownBtn) { modeCountdownBtn.style.background = '#4a90e2'; modeCountdownBtn.style.color = '#fff'; modeCountdownBtn.style.fontWeight = 'bold'; }
+      if (countdownInputs) countdownInputs.style.display = 'flex';
+      setupCountdownTime();
+    } else if (mode === 'pomodoro') {
+      if (modePomodoroBtn) { modePomodoroBtn.style.background = '#4a90e2'; modePomodoroBtn.style.color = '#fff'; modePomodoroBtn.style.fontWeight = 'bold'; }
+      if (pomodoroInputs) pomodoroInputs.style.display = 'flex';
+      if (pomodoroStatus) pomodoroStatus.style.display = 'block';
+      isPomodoroWorkState = true;
+      setupPomodoroTime();
+    }
+
+    updateTimerDisplay();
+  }
+
+  function setupCountdownTime() {
+    const mins = parseInt(document.getElementById('input-minutes')?.value || 0, 10);
+    const secs = parseInt(document.getElementById('input-seconds')?.value || 0, 10);
+    timerSeconds = (mins * 60) + secs;
+    updateTimerDisplay();
+  }
+
+  function setupPomodoroTime() {
+    if (isPomodoroWorkState) {
+      const workMins = parseInt(document.getElementById('pomo-work')?.value || 25, 10);
+      timerSeconds = workMins * 60;
+      if (pomodoroStatus) {
+        pomodoroStatus.textContent = '作業時間';
+        pomodoroStatus.style.color = '#e74c3c';
+      }
+    } else {
+      const breakMins = parseInt(document.getElementById('pomo-break')?.value || 5, 10);
+      timerSeconds = breakMins * 60;
+      if (pomodoroStatus) {
+        pomodoroStatus.textContent = '休憩時間';
+        pomodoroStatus.style.color = '#2ecc71';
+      }
+    }
+    updateTimerDisplay();
+  }
+
+  // タイマーの開始
+  function startTimer() {
+    if (isTimerRunning) return;
+    isTimerRunning = true;
+    if (startBtn) startBtn.style.display = 'none';
+    if (pauseBtn) pauseBtn.style.display = 'inline-block';
+
+    timerInterval = setInterval(() => {
+      if (currentTimerMode === 'stopwatch') {
+        timerSeconds++;
+      } else {
+        // カウントダウン / ポモドーロ
+        if (timerSeconds > 0) {
+          timerSeconds--;
+        } else {
+          playAlarmSound();
+          if (currentTimerMode === 'countdown') {
+            pauseTimer();
+            alert('タイマーが終了しました！');
+            setupCountdownTime();
+            return;
+          } else if (currentTimerMode === 'pomodoro') {
+            // ポモドーロの切り替え（作業 ↔ 休憩）
+            isPomodoroWorkState = !isPomodoroWorkState;
+            setupPomodoroTime();
+            alert(isPomodoroWorkState ? '休憩終了！作業を開始しましょう。' : '作業終了！休憩を取りましょう。');
+          }
+        }
+      }
+      updateTimerDisplay();
+    }, 1000);
+  }
+
+  // 一時停止
+  function pauseTimer() {
+    isTimerRunning = false;
+    if (timerInterval) clearInterval(timerInterval);
+    if (startBtn) startBtn.style.display = 'inline-block';
+    if (pauseBtn) pauseBtn.style.display = 'none';
+  }
+
+  // リセット
+  function resetTimer() {
+    pauseTimer();
+    if (currentTimerMode === 'stopwatch') {
+      timerSeconds = 0;
+    } else if (currentTimerMode === 'countdown') {
+      setupCountdownTime();
+    } else if (currentTimerMode === 'pomodoro') {
+      isPomodoroWorkState = true;
+      setupPomodoroTime();
+    }
+    updateTimerDisplay();
+  }
+
+  // イベントリスナー設定
+  if (modeStopwatchBtn) modeStopwatchBtn.addEventListener('click', () => switchTimerMode('stopwatch'));
+  if (modeCountdownBtn) modeCountdownBtn.addEventListener('click', () => switchTimerMode('countdown'));
+  if (modePomodoroBtn) modePomodoroBtn.addEventListener('click', () => switchTimerMode('pomodoro'));
+
+  if (startBtn) startBtn.addEventListener('click', startTimer);
+  if (pauseBtn) pauseBtn.addEventListener('click', pauseTimer);
+  if (resetBtn) resetBtn.addEventListener('click', resetTimer);
+
+  document.getElementById('input-minutes')?.addEventListener('change', () => { if (currentTimerMode === 'countdown') setupCountdownTime(); });
+  document.getElementById('input-seconds')?.addEventListener('change', () => { if (currentTimerMode === 'countdown') setupCountdownTime(); });
+  document.getElementById('pomo-work')?.addEventListener('change', () => { if (currentTimerMode === 'pomodoro') setupPomodoroTime(); });
+  document.getElementById('pomo-break')?.addEventListener('change', () => { if (currentTimerMode === 'pomodoro') setupPomodoroTime(); });
+  
   initApp();
 
 });
