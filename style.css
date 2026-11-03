@@ -8,6 +8,7 @@
   --color-monthly: #8769db;
   --color-daily: #c86b5e;
   --color-custom: #eebb40;
+  --color-timer: #4fa9e9;
 }
 
 * {
@@ -95,55 +96,8 @@ body {
 .monthly-log { background-color: var(--color-monthly); }
 .daily-log { background-color: var(--color-daily); }
 .custom-log { background-color: var(--color-custom); color: #333; }
+.timer-log { background-color: var(--color-timer); }
 
-/* ============================
-   タブレット・スマホ用のレイアウト調整
-============================ */
-@media (max-width: 900px) {
-  body {
-    align-items: flex-start;
-    padding: 15px;
-  }
-  
-  .notebook-container {
-    flex-direction: column;
-    border-radius: 12px;
-    margin-left: 0;
-    min-height: auto;
-  }
-  
-  .notebook-container::before {
-    display: none;
-  }
-
-  .index-tabs {
-    flex-direction: row;
-    flex-wrap: wrap;
-    position: relative;
-    left: 0;
-    top: 0;
-    width: 100%;
-    padding: 15px 10px;
-    background: transparent;
-    justify-content: center;
-    gap: 8px;
-  }
-  
-  .tab-btn {
-    border-radius: 8px;
-    transform: rotate(0) !important;
-    width: auto !important;
-    font-size: 1rem;
-    padding: 8px 16px;
-    box-shadow: 1px 2px 5px rgba(0,0,0,0.15);
-    text-align: center;
-  }
-  
-  .tab-btn:hover, .tab-btn.active {
-    transform: translateY(-2px) !important;
-    box-shadow: 1px 4px 8px rgba(0,0,0,0.15);
-  }
-}
 
 /* ============================
    カレンダーエリア（ページの中身）
