@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>バレットジャーナル (統合版)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,6 +29,7 @@
       
       --font-journal: 'Zen Kurenaido', sans-serif;
       --row-height: 32px;
+      --month-header-h: 56px;   /* 月ヘッダーの高さ(グラフの開始位置を日付の行に揃えるために固定) */
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -107,6 +108,7 @@
     /* Monthly 左ページ: Header */
     .month-header {
       display: flex; align-items: center; justify-content: space-between;
+      height: var(--month-header-h);
       margin-bottom: 20px; padding-bottom: 8px; border-bottom: 2px solid var(--text-color);
     }
     .month-title-group { display: flex; align-items: baseline; gap: 15px; }
@@ -146,6 +148,8 @@
     /* Monthly 右ページ: グラフ＆タスク */
     .right-page-split { display: flex; gap: 15px; height: 100%; }
     .graph-section { display: flex; flex-direction: column; border-left: 1px solid var(--text-color); border-right: 2px solid var(--text-color); border-top: 1px solid var(--text-color); border-bottom: 1px solid var(--text-color); background: rgba(255, 255, 255, 0.5); position: relative; }
+    /* 左ページの「月ヘッダー + 下余白(20px)」と同じだけ下げて、グラフの行を日付の行に揃える */
+    .graph-section { margin-top: calc(var(--month-header-h) + 20px); }
     .graph-header-container { height: 40px; border-bottom: 2px solid var(--text-color); display: flex; flex-direction: column; justify-content: center; background: rgba(230, 225, 215, 0.4); }
     .graph-axis-labels { display: flex; justify-content: space-between; padding: 0 8px; font-size: 0.75rem; font-weight: bold; }
     .graph-axis-sub { display: flex; justify-content: space-between; padding: 0 8px; font-size: 0.7rem; color: #666; }
@@ -200,17 +204,93 @@
     .canvas-btn:hover { background: var(--text-color); color: var(--page-color); }
     .canvas-btn.active-tool { background: var(--color-custom); border-color: var(--color-custom); color: #333; font-weight: bold; }
 
-    /* レスポンシブ (Monthly) */
-    @media (max-width: 992px) {
+    /* 画面幅が1400px以下でも、左に飛び出すしおり(最大95px)が画面外に切れないようにする */
+    @media (max-width: 1400px) {
+      .notebook-container { margin-left: 90px; }
+    }
+
+    /* ==========================================
+       レスポンシブ (スマホ・タブレット: 画面幅1240px以下)
+       ・Monthly は見開きを「横スクロール」にする(左ページ → 右ページをスワイプ)
+       ・Future/Monthly/Daily/Custom のタブは、全画面と同じく「しおり」として左に飛び出させる
+       ========================================== */
+    @media (max-width: 1240px) {
       body { padding: 10px 5px; }
-      .notebook-container { margin-left: 0; flex-direction: column; }
-      .index-tabs { position: relative; left: 0; top: 0; flex-direction: row; justify-content: center; width: 100%; margin-bottom: 15px; gap: 6px; }
-      .tab-btn { width: auto !important; transform: none !important; border-radius: 6px; font-size: 0.95rem; padding: 6px 14px; text-align: center; }
-      .notebook-spread { flex-direction: column; border-radius: 12px; }
-      .spine-divider { height: 12px; width: 100%; border-top: 1px solid rgba(0,0,0,0.06); border-bottom: 1px solid rgba(0,0,0,0.06); }
-      .page-left, .page-right { padding: 15px 10px; }
-      .right-page-split { flex-direction: column; }
+
+      /* しおりが飛び出す分の左余白(しおり自体のデザインは style.css の全画面用をそのまま使う) */
+      .notebook-container { margin-left: 90px; width: auto; flex: 1 1 0; min-width: 0; }
+
+      /* 月ヘッダー内の Timer ボタンは、しおり型ではなく小さなボタンにする */
+      .month-header .tab-btn { width: auto !important; transform: none !important; border-radius: 6px; font-size: 0.95rem; padding: 6px 14px; text-align: center; flex-shrink: 0; }
+      .nav-btn { flex-shrink: 0; }
+
+      /* 見開き全体を横スクロールの帯にする */
+      .notebook-spread {
+        flex-direction: row;              /* 縦積みにせず、左右に並べたまま */
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;   /* 端でブラウザの「戻る」スワイプが誤爆しないように */
+        scroll-snap-type: x proximity;    /* ページの区切りで軽く吸着 */
+        scroll-padding-left: 8px;
+      }
+      .spine-divider { width: 12px; }
+
+      /* 各ページ: 画面幅いっぱい(右に次ページを24pxだけ覗かせる)。
+         習慣が増えて中身が広い場合は、中身の幅まで自動で広がる */
+      .page-left, .page-right {
+        flex: 0 0 auto;
+        min-width: calc(100% - 24px);
+        padding: 15px 10px;
+        overflow: visible;                /* ページ内の横スクロールをやめて、スクロールを1本に統一 */
+      }
+      .page-left { scroll-snap-align: start; }
+
+      /* 月ヘッダー: 幅の計算から外し、ページ幅に合わせて収める */
+      .month-header { width: 0; min-width: 100%; gap: 6px; }
+      .month-title-group { flex: 1 1 0; min-width: 0; justify-content: center; flex-wrap: nowrap; gap: 0 8px; text-align: center; }
+      .month-title-en { font-size: 1.4rem; letter-spacing: 3px; }
+      .month-title-jp { font-size: 1rem; white-space: nowrap; }
+
+      /* 日付ログ: 入力欄の標準幅でページが必要以上に広がらないようにする(余った幅は自動で伸びる) */
+      .date-log-section { min-width: 170px; }
+      .grid-header-row { font-size: 0.8rem; }
+      .log-col-head { width: 0; min-width: 0; padding-left: 6px; overflow: hidden; white-space: nowrap; }
+      .log-input { width: 0; min-width: 0; }
+
+      /* 習慣トラッカーのマスが狭い画面で潰れないように */
+      .habit-tracker-section { flex-shrink: 0; }
+      .habit-col-header, .habit-cell, .habit-add-btn { flex-shrink: 0; }
+
+      /* 右ページ: グラフとタスクも横に並べたまま */
+      .right-page-split { flex-direction: row; gap: 12px; height: auto; }
+      .graph-section { flex: 0 0 232px; scroll-snap-align: start; }
       .graph-body { width: 100%; }
+      .task-section { flex: 1 1 auto; width: 260px; min-width: 220px; padding-left: 0; scroll-snap-align: start; }
+      .task-add-form .task-input { min-width: 0; width: 0; }
+      .task-add-form .task-add-btn { flex-shrink: 0; white-space: nowrap; }
+    }
+
+    /* スマホ: 横幅が足りないので、しおりを細くして縦書きにする */
+    @media (max-width: 600px) {
+      .notebook-container { margin-left: 38px; }
+      .index-tabs { left: -34px; top: 24px; gap: 10px; }
+      .index-tabs .tab-btn {
+        display: flex; align-items: center; justify-content: center;
+        writing-mode: vertical-lr;
+        width: 44px; min-height: 80px;
+        padding: 10px 10px 10px 0;        /* 右10pxはページの下に潜り込む分 */
+        font-size: 0.85rem; letter-spacing: 1px; text-align: center;
+        border-radius: 10px 0 0 10px;
+      }
+      .index-tabs .tab-btn:hover, .index-tabs .tab-btn.active { width: 52px; transform: translateX(-8px) rotate(0deg); }
+
+      /* 月ヘッダー: 2段(英語月名 / 年月)にして高さを固定 */
+      .nav-btn { padding: 2px 8px; font-size: 1.1rem; }
+      .month-header .tab-btn { font-size: 0.85rem; padding: 6px 10px; }
+      .month-title-group { flex-direction: column; align-items: center; gap: 0; }
+      .month-title-en { font-size: clamp(1rem, calc((100vw - 201px) / 7.4), 1.4rem); letter-spacing: 0.1em; line-height: 1.15; }
+      .month-title-jp { line-height: 1.15; }
     }
   </style>
 </head>
@@ -239,6 +319,7 @@
             <span id="month-title-jp" class="month-title-jp"></span>
           </div>
           <button id="next-month-btn" class="nav-btn">&gt;</button>
+          <button class="tab-btn timer-log" data-target="view-timer">Timer</button>
         </div>
         <div class="left-grid-container">
           <!-- 日付ログ -->
@@ -385,6 +466,45 @@
       </div>
     </main>
 
+    <!-- =====================================
+         5. Timer Log (ドロワー)
+         ===================================== -->
+    <main id="view-timer" class="drawer-panel">
+      <button class="close-drawer-btn">×</button>
+      <h2 style="font-size: 1.8rem; margin-bottom: 15px;">Timer</h2>
+
+      <!-- モード選択タブ -->
+      <div style="display: flex; gap: 8px; margin-bottom: 25px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+        <button id="mode-stopwatch-btn" class="timer-mode-btn active" style="padding: 6px 12px; border: none; background: #4a90e2; color: #fff; border-radius: 4px; cursor: pointer; font-weight: bold;">ストップウォッチ</button>
+        <button id="mode-countdown-btn" class="timer-mode-btn" style="padding: 6px 12px; border: none; background: #eee; color: #333; border-radius: 4px; cursor: pointer;">タイマー</button>
+        <button id="mode-pomodoro-btn" class="timer-mode-btn" style="padding: 6px 12px; border: none; background: #eee; color: #333; border-radius: 4px; cursor: pointer;">ポモドーロ</button>
+      </div>
+
+      <!-- タイマーディスプレイ -->
+      <div style="text-align: center; margin: 20px 0; background: #fdfdfd; padding: 25px 15px; border-radius: 12px; border: 1px dashed #ccc;">
+        <div id="pomodoro-status" style="font-size: 1.1rem; margin-bottom: 10px; color: #e74c3c; font-weight: bold; display: none;">作業時間</div>
+        <div id="timer-display" style="font-size: 3.8rem; font-weight: bold; font-family: monospace; color: #2c3e50; letter-spacing: 2px;">00:00:00</div>
+      </div>
+
+      <!-- 設定エリア（タイマー用） -->
+      <div id="countdown-inputs" style="display: none; justify-content: center; align-items: center; gap: 10px; margin-bottom: 20px;">
+        <label style="font-size: 0.9rem;">分: <input type="number" id="input-minutes" min="0" max="180" value="25" style="width: 55px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center;"></label>
+        <label style="font-size: 0.9rem;">秒: <input type="number" id="input-seconds" min="0" max="59" value="0" style="width: 55px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center;"></label>
+      </div>
+
+      <!-- 設定エリア（ポモドーロ用） -->
+      <div id="pomodoro-inputs" style="display: none; justify-content: center; align-items: center; gap: 15px; margin-bottom: 20px;">
+        <label style="font-size: 0.9rem;">作業(分): <input type="number" id="pomo-work" min="1" max="120" value="25" style="width: 50px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center;"></label>
+        <label style="font-size: 0.9rem;">休憩(分): <input type="number" id="pomo-break" min="1" max="60" value="5" style="width: 50px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center;"></label>
+      </div>
+
+      <!-- 操作ボタン -->
+      <div style="display: flex; justify-content: center; gap: 15px;">
+        <button id="timer-start-btn" class="submit-btn" style="padding: 10px 24px; font-size: 1rem; border-radius: 6px;">スタート</button>
+        <button id="timer-pause-btn" class="submit-btn" style="padding: 10px 24px; font-size: 1rem; border-radius: 6px; background: #f39c12; display: none;">一時停止</button>
+        <button id="timer-reset-btn" class="canvas-btn" style="padding: 10px 20px; font-size: 1rem; border-radius: 6px;">リセット</button>
+      </div>
+    </main>
   </div> <!-- /.notebook-container の閉じタグ -->
 
   <!-- 追加: ドロワー展開時の背景暗転用オーバーレイ -->
