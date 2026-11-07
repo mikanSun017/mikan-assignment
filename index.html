@@ -216,6 +216,19 @@
       .notebook-container { margin-left: 90px; }
     }
 
+    /* 認証ゲート (匿名サインインの途中・失敗したときだけ表示) */
+    .auth-gate { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(250, 248, 243, 0.94); }
+    .auth-gate[hidden] { display: none; }
+    .auth-card { width: 100%; max-width: 360px; padding: 22px 24px; text-align: center; background: #ffffff; border: 2px solid var(--text-color); border-radius: 8px; box-shadow: 4px 4px 0 rgba(0,0,0,0.15); font-family: var(--font-journal); }
+    .auth-card p { margin: 0 0 14px; font-size: 1.05rem; line-height: 1.6; }
+    #turnstile-box { display: flex; justify-content: center; }
+    #turnstile-box[hidden] { display: none; }
+    .auth-retry-btn { margin-top: 12px; padding: 8px 18px; border: 2px solid var(--text-color); border-radius: 6px; background: var(--color-monthly); color: #ffffff; font-family: var(--font-journal); font-size: 1rem; cursor: pointer; }
+    .auth-retry-btn[hidden] { display: none; }
+    /* 保存エラーなどの通知 */
+    .app-toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 1100; max-width: min(92vw, 420px); padding: 10px 16px; background: #333333; color: #ffffff; border-radius: 8px; font-size: 0.95rem; line-height: 1.5; box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+    .app-toast[hidden] { display: none; }
+
     /* ==========================================
        レスポンシブ (スマホ・タブレット: 画面幅1240px以下)
        ・Monthly は見開きを「横スクロール」にする(左ページ → 右ページをスワイプ)
@@ -551,6 +564,17 @@
       </div>
     </div>
   </div>
+
+  <!-- 匿名サインインの途中・失敗したときだけ表示されるゲート (app.js が制御) -->
+  <div id="auth-gate" class="auth-gate" role="alertdialog" aria-live="polite" hidden>
+    <div class="auth-card">
+      <p id="auth-message">準備しています…</p>
+      <div id="turnstile-box" hidden></div>
+      <button type="button" id="auth-retry-btn" class="auth-retry-btn" hidden>もう一度試す</button>
+    </div>
+  </div>
+  <!-- 保存エラーなどの通知 -->
+  <div id="app-toast" class="app-toast" role="status" aria-live="polite" hidden></div>
 
   <!-- Supabase JS SDK の読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
