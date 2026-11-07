@@ -8,6 +8,251 @@ const SUPABASE_ANON_KEY = 'sb_publishable_bMr8qxjYHSke1KowDbkbYA_QAyTDC49'; // �
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ==========================================
+// 認証: Supabase 匿名サインイン (メールは一切使いません)
+// ------------------------------------------
+// ・初回アクセスのときだけ匿名ユーザーを1人作り、以後はブラウザに保存されたセッションを使い回す
+// ・使い捨てアカウントの量産対策(サイト側):
+//     1) CAPTCHA (Cloudflare Turnstile) を通った人だけがユーザーを作れる
+//     2) 既存セッションがあれば絶対に新規作成しない / 複数タブの同時作成もロックで防ぐ
+//     3) 失敗しても自動で再試行しない (ボタンを押したときだけ再試行)
+//   サーバー側の対策 (レート制限・全体上限・掃除・容量制限) は supabase_anonymous_setup.sql を参照
+// ==========================================
+
+// Cloudflare Turnstile の「サイトキー」(公開してよい値。秘密鍵は Supabase 側にだけ入れる)
+//   '' (空) のままだと CAPTCHA なしでサインインします。動作確認用です。
+//   公開する前に必ずキーを設定し、Supabase の CAPTCHA 保護も有効にしてください。
+const TURNSTILE_SITE_KEY = '';
+
+let currentUserId = null;   // ログイン中の(匿名)ユーザーID
+
+// ---- 画面表示まわり ----
+function showAuthGate(message, { retry = false, widget = false } = {}) {
+  const gate = document.getElementById('auth-gate');
+  if (!gate) return;
+  document.getElementById('auth-message').textContent = message;
+  document.getElementById('auth-retry-btn').hidden = !retry;
+  document.getElementById('turnstile-box').hidden = !widget;
+  gate.hidden = false;
+}
+
+function hideAuthGate() {
+  const gate = document.getElementById('auth-gate');
+  if (gate) gate.hidden = true;
+}
+
+let toastTimer = null;
+function showToast(message) {
+  const el = document.getElementById('app-toast');
+  if (!el) { console.warn(message); return; }
+  el.textContent = message;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 6000);
+}
+
+// 保存に失敗したときの通知 (容量制限・権限エラー・通信エラーを区別して案内する)
+function notifySaveError(error) {
+  console.error('save error:', error);
+  const msg = String((error && error.message) || '');
+  if (msg.includes('quota_exceeded') || (error && error.code === '23514')) {
+    showToast('保存できる上限(件数・サイズ)を超えています。古いデータを整理してください。');
+  } else if ((error && error.code === '42501') || /row-level security/i.test(msg)) {
+    showToast('保存する権限がありません。ページを再読み込みしてください。');
+  } else {
+    showToast('保存に失敗しました。通信状況を確認して、もう一度お試しください。');
+  }
+}
+
+// 他のユーザーと ID が衝突しないように、ランダムな ID を作る
+function newId(prefix) {
+  const rnd = (window.crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  return `${prefix}_${rnd}`;
+}
+
+// ---- Cloudflare Turnstile ----
+let turnstileLoading = null;
+let turnstileWidgetId = null;
+
+function loadTurnstile() {
+  if (window.turnstile) return Promise.resolve();
+  if (!turnstileLoading) {
+    turnstileLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      s.async = true;
+      s.defer = true;
+      s.onload = () => {
+        if (window.turnstile && typeof window.turnstile.ready === 'function') window.turnstile.ready(() => resolve());
+        else resolve();
+      };
+      s.onerror = () => { turnstileLoading = null; reject(new Error('turnstile-load-failed')); };
+      document.head.appendChild(s);
+    });
+  }
+  return turnstileLoading;
+}
+
+function cleanupTurnstile() {
+  if (turnstileWidgetId !== null && window.turnstile) {
+    try { window.turnstile.remove(turnstileWidgetId); } catch (e) { /* 無視 */ }
+  }
+  turnstileWidgetId = null;
+  const box = document.getElementById('turnstile-box');
+  if (box) box.innerHTML = '';
+}
+
+// CAPTCHA のトークンを取得する (トークンは1回しか使えない。サイトキーが空なら null)
+async function getCaptchaToken() {
+  if (!TURNSTILE_SITE_KEY) return null;
+  await loadTurnstile();
+  cleanupTurnstile();
+  return new Promise((resolve, reject) => {
+    turnstileWidgetId = window.turnstile.render(document.getElementById('turnstile-box'), {
+      sitekey: TURNSTILE_SITE_KEY,
+      language: 'ja',
+      callback: (token) => resolve(token),
+      'error-callback': (code) => reject(new Error('turnstile-error:' + code)),
+      'timeout-callback': () => reject(new Error('turnstile-timeout'))
+    });
+  });
+}
+
+// ---- 匿名サインイン ----
+function describeAuthError(error) {
+  const code = (error && error.code) || '';
+  const status = error && error.status;
+  const message = String((error && error.message) || '');
+  if (message.startsWith('turnstile-')) {
+    return `人間かどうかの確認(CAPTCHA)を表示できませんでした (${message.replace('turnstile-', '')})。もう一度お試しください。`;
+  }
+  if (code === 'anonymous_provider_disabled') {
+    return '【設定エラー】Supabase で匿名サインインが有効になっていません。';
+  }
+  if (code === 'captcha_failed') {
+    return TURNSTILE_SITE_KEY
+      ? '人間かどうかの確認(CAPTCHA)に失敗しました。もう一度お試しください。'
+      : '【設定エラー】Supabase で CAPTCHA が有効ですが、app.js の TURNSTILE_SITE_KEY が空です。';
+  }
+  if (code === 'over_request_rate_limit' || status === 429) {
+    return '現在、新規ユーザーの受付を一時的に制限しています。しばらく待ってから、もう一度お試しください。';
+  }
+  return 'ユーザーの準備に失敗しました。通信状況を確認して、もう一度お試しください。';
+}
+
+// 通信エラー・サーバーエラー(=「ユーザーが消えた」とは限らないエラー)かどうか
+function isRetryableAuthError(error) {
+  return !!error && (error.name === 'AuthRetryableFetchError' || !error.status || error.status >= 500);
+}
+
+// すでに有効なセッションがあれば、そのユーザーを返す。無ければ null
+async function getExistingUser() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) return null;
+
+  // サーバーに問い合わせて、ユーザーが実在するか確認する
+  // (掃除で削除された・別タブでログアウトされた場合などに、壊れたセッションを使い続けないため)
+  const { data, error } = await supabaseClient.auth.getUser();
+  if (!error && data && data.user) return data.user;
+
+  // オフライン等: 「消えた」とは限らないので、今のセッションをそのまま使う
+  if (isRetryableAuthError(error)) return session.user;
+
+  // 存在しない/無効: 古いセッションをこのブラウザから捨てて、作り直す
+  await supabaseClient.auth.signOut({ scope: 'local' });
+  return null;
+}
+
+// 複数タブが同時に開かれても、匿名ユーザーを二重に作らないようにする
+function withAuthLock(fn) {
+  if (navigator.locks && typeof navigator.locks.request === 'function') {
+    return navigator.locks.request('bullet-journal-anon-signin', fn);
+  }
+  return fn();
+}
+
+async function ensureAnonymousUser() {
+  // 1) すでにあるなら、それを使う (新しいアカウントは作らない)
+  const existing = await getExistingUser();
+  if (existing) return { user: existing };
+
+  // 2) 無ければ作る。ロックを取れたあとにもう一度確認する (他のタブが先に作ったかもしれない)
+  return withAuthLock(async () => {
+    const again = await getExistingUser();
+    if (again) return { user: again };
+
+    showAuthGate(
+      TURNSTILE_SITE_KEY ? '確認しています…(チェックが表示されたら押してください)' : '準備しています…',
+      { widget: !!TURNSTILE_SITE_KEY }
+    );
+
+    let captchaToken = null;
+    try {
+      captchaToken = await getCaptchaToken();
+    } catch (e) {
+      cleanupTurnstile();
+      return { error: e };
+    }
+
+    const { data, error } = await supabaseClient.auth.signInAnonymously(
+      captchaToken ? { options: { captchaToken } } : undefined
+    );
+    cleanupTurnstile();
+    if (error) return { error };
+    return { user: data.user };
+  });
+}
+
+// 別タブでのログアウト・ユーザー削除などでセッションが失われたら、画面を作り直す
+let sessionWatchStarted = false;
+function watchSession() {
+  if (sessionWatchStarted) return;
+  sessionWatchStarted = true;
+  supabaseClient.auth.onAuthStateChange((event) => {
+    if (event !== 'SIGNED_OUT') return;
+    // 無限リロードを防ぐ: 10秒以内にもう一度起きたら、リロードせずに案内だけ出す
+    const last = Number(sessionStorage.getItem('bj_reloaded_at') || 0);
+    if (Date.now() - last < 10000) {
+      showAuthGate('セッションが切れました。ページを再読み込みしてください。');
+      return;
+    }
+    sessionStorage.setItem('bj_reloaded_at', String(Date.now()));
+    location.reload();
+  });
+}
+
+// 「最後にいつ来たか」を記録する (サーバー側の掃除の判断に使う)。6時間に1回だけ
+async function touchActivity() {
+  try {
+    const key = `bj_last_seen:${currentUserId}`;
+    if (Date.now() - Number(localStorage.getItem(key) || 0) < 6 * 3600 * 1000) return;
+    const { error } = await supabaseClient
+      .from('user_activity')
+      .upsert({ user_id: currentUserId, last_seen_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error) console.warn('user_activity update skipped:', error.message);
+    else localStorage.setItem(key, String(Date.now()));
+  } catch (e) {
+    console.warn('user_activity update failed:', e);
+  }
+}
+
+// 認証を完了させる。成功したら true
+async function bootAuth() {
+  const result = await ensureAnonymousUser();
+  if (result.error) {
+    console.error('anonymous sign-in failed:', result.error);
+    showAuthGate(describeAuthError(result.error), { retry: true });
+    return false;
+  }
+  currentUserId = result.user.id;
+  hideAuthGate();
+  watchSession();
+  touchActivity();
+  return true;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
   // ==========================================
@@ -127,6 +372,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadMonthlyRecord(monthKey) {
+    const emptyRecord = {
+      month_key: monthKey,
+      logs: {},
+      habit_items: [], // デフォルト空
+      habit_data: {},
+      graph_data: {},
+      tasks: [{ id: 't1', text: '初期サンプルタスク', status: 0 }]
+    };
+    if (!currentUserId) return emptyRecord;   // サインイン前は何も読まない
+
     const { data, error } = await supabaseClient
       .from('monthly_data')
       .select('*')
@@ -135,22 +390,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (error) console.error('monthly_data load error:', error);
 
-    return data || {
-      month_key: monthKey,
-      logs: {},
-      habit_items: [], // デフォルト空
-      habit_data: {},
-      graph_data: {},
-      tasks: [{ id: 't1', text: '初期サンプルタスク', status: 0 }]
-    };
+    return data || emptyRecord;
   }
 
   async function updateMonthlyRecord(monthKey, payload) {
+    if (!currentUserId) return;
+    // 主キーは (user_id, month_key)。自分の行だけが更新される
     const { error } = await supabaseClient
       .from('monthly_data')
-      .upsert({ month_key: monthKey, ...payload });
+      .upsert({ user_id: currentUserId, month_key: monthKey, ...payload }, { onConflict: 'user_id,month_key' });
 
-    if (error) console.error('monthly_data save error:', error);
+    if (error) notifySaveError(error);
   }
 
   // ==========================================
@@ -541,7 +791,7 @@ document.addEventListener('DOMContentLoaded', () => {
       saveDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
 
       const newJournal = {
-        id: 'journal_' + Date.now(),
+        id: newId('journal'),
         content: journalInput.value.trim(),
         attribute: selectedAttr,
         created_at: saveDate.toISOString()
@@ -555,6 +805,8 @@ document.addEventListener('DOMContentLoaded', () => {
         journalData.unshift(newJournal);
         journalInput.value = '';
         renderJournalList();
+      } else {
+        notifySaveError(error);
       }
     });
   }
@@ -644,7 +896,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!futureInput.value.trim()) return;
 
       const newFuture = {
-        id: 'future_' + Date.now(),
+        id: newId('future'),
         target_month: futureSelect.value,
         content: futureInput.value.trim(),
         color: futureColorInput ? futureColorInput.value : '#9b59b6',
@@ -660,6 +912,8 @@ document.addEventListener('DOMContentLoaded', () => {
         futureInput.value = '';
         renderFutureGrid();
         renderMonthlyLog();
+      } else {
+        notifySaveError(error);
       }
     });
   }
@@ -782,7 +1036,7 @@ document.addEventListener('DOMContentLoaded', () => {
       saveBtn.addEventListener('click', async () => {
         const dataURL = canvas.toDataURL();
         const newNote = {
-          id: 'c_note_' + Date.now(),
+          id: newId('c_note'),
           image: dataURL,
           category: categorySelect ? categorySelect.value : 'その他',
           created_at: new Date().toISOString()
@@ -796,6 +1050,8 @@ document.addEventListener('DOMContentLoaded', () => {
           customNotesData.unshift(newNote);
           renderCustomNotes();
           ctx.clearRect(0, 0, canvas.width, canvas.height);
+        } else {
+          notifySaveError(error);
         }
       });
     }
@@ -1016,6 +1272,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pomo-work')?.addEventListener('change', () => { if (currentTimerMode === 'pomodoro') setupPomodoroTime(); });
   document.getElementById('pomo-break')?.addEventListener('change', () => { if (currentTimerMode === 'pomodoro') setupPomodoroTime(); });
   
-  initApp();
+  // ==========================================
+  // 起動: 認証 (匿名サインイン) → 成功したらアプリを開始
+  // ==========================================
+  async function startApp() {
+    const ok = await bootAuth();
+    if (ok) await initApp();
+  }
+  const authRetryBtn = document.getElementById('auth-retry-btn');
+  if (authRetryBtn) {
+    authRetryBtn.addEventListener('click', () => { authRetryBtn.hidden = true; startApp(); });
+  }
+  startApp();
 
 });
