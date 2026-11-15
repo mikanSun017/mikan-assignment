@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>バレットジャーナル (統合版)</title>
+  <title>楽々バレットジャーナル</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Kurenaido&display=swap" rel="stylesheet">
@@ -159,6 +159,9 @@
     .graph-bg-grid { display: flex; flex-direction: column; }
     .graph-row { height: var(--row-height); display: flex; border-bottom: 1px solid var(--line-color); cursor: pointer; }
     .graph-row:hover { background-color: rgba(230, 230, 250, 0.4); }
+    /* 今日の行 (日付ログ・習慣・グラフの3列とも薄い黄色)。hover より後ろに書いて優先させる */
+    .date-log-row.today, .habit-row.today, .graph-row.today { background-color: rgba(255, 238, 140, 0.45); }
+    .date-log-row.today:hover, .graph-row.today:hover { background-color: rgba(255, 230, 110, 0.6); }
     .graph-col-guide { flex: 1; border-right: 1px dashed var(--line-color); height: 100%; }
     .graph-col-guide:last-child { border-right: none; }
     .graph-svg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -232,7 +235,7 @@
     /* ==========================================
        レスポンシブ (スマホ・タブレット: 画面幅1240px以下)
        ・Monthly は見開きを「横スクロール」にする(左ページ → 右ページをスワイプ)
-       ・Future/Monthly/Daily/Custom のタブは、全画面と同じく「しおり」として左に飛び出させる
+       ・Future/Monthly/Daily/Draw のタブは、全画面と同じく「しおり」として左に飛び出させる
        ========================================== */
     @media (max-width: 1240px) {
       body { padding: 10px 5px; }
@@ -323,7 +326,7 @@
       <a href="#" class="tab-btn future-log" data-target="view-future">Future</a>
       <a href="#" class="tab-btn monthly-log active" data-target="view-monthly">Monthly</a>
       <a href="#" class="tab-btn daily-log" data-target="view-daily">Daily</a>
-      <a href="#" class="tab-btn custom-log" data-target="view-custom">Custom</a>
+      <a href="#" class="tab-btn custom-log" data-target="view-custom">Draw</a>
     </nav>
 
     <!-- =====================================
@@ -404,7 +407,7 @@
         <div class="color-select-wrapper">
           <input type="color" id="future-color-input" class="color-picker" value="#9b59b6">
         </div>
-        <input type="text" id="future-input" class="task-input" placeholder="予定を入力..." required style="flex: 1;">
+        <input type="text" id="future-input" class="task-input" placeholder="予定を入力..." required style="flex: 1 1 140px; min-width: 0;">
         <button type="submit" class="submit-btn future-btn">追加</button>
       </form>
       
@@ -449,7 +452,7 @@
          ===================================== -->
     <main id="view-custom" class="drawer-panel">
       <button class="close-drawer-btn">×</button>
-      <h2 style="font-size: 1.8rem; margin-bottom: 10px;">Custom Log</h2>
+      <h2 style="font-size: 1.8rem; margin-bottom: 10px;">Draw Log</h2>
       
       <div class="canvas-container">
         <div class="drawing-tools" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;">
