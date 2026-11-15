@@ -266,6 +266,7 @@ body {
 /* ノートの罫線に直接書き込むようなデザイン */
 .input-group input {
   flex: 1;
+  min-width: 0; /* 標準幅より縮められず、右の「記録」ボタンが見切れるのを防ぐ */
   font-family: 'Zen Kurenaido', sans-serif;
   font-size: 1.3rem;
   padding: 5px 10px;
@@ -291,6 +292,8 @@ body {
   cursor: pointer;
   transition: transform 0.1s;
   border-radius: 255px 15px 225px 15px/15px 225px 15px 255px; /* 手書き風ボタン */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .submit-btn:hover {
@@ -629,6 +632,8 @@ body {
 /* 記録の内容（テキスト）が伸びるようにする */
 .journal-content {
   flex-grow: 1;
+  min-width: 0;
+  overflow-wrap: anywhere; /* 長い文字列でも枠からはみ出さない */
 }
 
 /* Future Logのリストアイテム */
@@ -764,6 +769,7 @@ body {
   width: 100%;
   max-width: 500px;
   height: 100vh;
+  height: 100dvh; /* スマホでアドレスバー等に隠れないよう、見えている高さに合わせる */
   background-color: var(--page-color);
   box-shadow: -10px 0 30px rgba(0,0,0,0.15);
   border-left: 1px solid var(--line-color);
