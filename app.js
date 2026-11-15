@@ -524,6 +524,42 @@ document.addEventListener('DOMContentLoaded', () => {
   // Webフォントの読み込み後は文字の長さが変わるので、測り直す
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeaderHeight);
 
+  let currentDaysInMonth = 30;
+  let currentGraphData = {};
+
+  // ログの文字量に応じて行の高さを伸縮し、習慣・グラフの同じ日の行と揃える
+  function adjustRowHeight(textarea) {
+    if (!textarea) return false;
+    const baseHeight = 32;
+    const prevHeight = textarea.offsetHeight;
+    textarea.style.height = 'auto';
+    const newHeight = Math.max(baseHeight, textarea.scrollHeight);
+    textarea.style.height = `${newHeight}px`;
+
+    const rowDiv = textarea.closest('.date-log-row');
+    const day = rowDiv ? rowDiv.dataset.day : null;
+    if (!day) return prevHeight !== newHeight;
+
+    rowDiv.style.height = `${newHeight}px`;
+    const habitRow = document.querySelector(`#habit-rows-container .habit-row[data-day="${day}"]`);
+    const graphRow = document.querySelector(`#graph-bg-grid .graph-row[data-day="${day}"]`);
+    if (habitRow) habitRow.style.height = `${newHeight}px`;
+    if (graphRow) graphRow.style.height = `${newHeight}px`;
+
+    return prevHeight !== newHeight;
+  }
+
+  function adjustAllRowHeights() {
+    document.querySelectorAll('#date-log-rows-container .log-input').forEach(ta => {
+      adjustRowHeight(ta);
+    });
+    renderGraphSVG(currentDaysInMonth, currentGraphData);
+  }
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(adjustAllRowHeights);
+  }
+
   // 今日の行を薄い黄色にする (表示中の月が「今月」のときだけ)。
   // 日付ログ・習慣・グラフの各行に付けた data-day を使い、3列とも同時に切り替える。
   function applyTodayHighlight() {
@@ -647,8 +683,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.switchView('view-daily');
       });
 
-      const logInput = document.createElement('input');
-      logInput.type = 'text';
+      const logInput = document.createElement('textarea');
+      logInput.rows = 1;
       logInput.className = 'log-input';
       logInput.value = logTexts[day] || '';
       logInput.placeholder = '...';
@@ -666,6 +702,9 @@ document.addEventListener('DOMContentLoaded', () => {
       pendingLogFlushers.add(saveThisLog);
 
       logInput.addEventListener('input', () => {
+        if (adjustRowHeight(logInput)) {
+          renderGraphSVG(currentDaysInMonth, currentGraphData);
+        }
         setSaveStatus('saving');
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(saveThisLog, 600);
@@ -712,21 +751,26 @@ document.addEventListener('DOMContentLoaded', () => {
       graphBgGrid.appendChild(gRow);
     }
 
+    currentDaysInMonth = daysInMonth;
+    currentGraphData = graphData;
+
     applyTodayHighlight();
-    setTimeout(() => renderGraphSVG(daysInMonth, graphData), 50);
+    adjustAllRowHeights();
+    setTimeout(adjustAllRowHeights, 50);
     renderTaskList(monthKey, taskList);
   }
 
   function renderGraphSVG(daysInMonth, graphData) {
     const svg = document.getElementById('graph-svg');
     const container = document.getElementById('graph-body');
-    if (!svg || !container) return;
+    const bgGrid = document.getElementById('graph-bg-grid');
+    if (!svg || !container || !bgGrid) return;
     
     const width = container.clientWidth;
-    const rowHeight = 32; 
+    const totalHeight = bgGrid.offsetHeight || (daysInMonth * 32);
 
     svg.setAttribute('width', width);
-    svg.setAttribute('height', daysInMonth * rowHeight);
+    svg.setAttribute('height', totalHeight);
     svg.innerHTML = '';
 
     const moodPoints = [];
@@ -734,7 +778,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const entry = graphData[day];
-      const y = (day - 0.5) * rowHeight; 
+      const rowEl = bgGrid.querySelector(`.graph-row[data-day="${day}"]`);
+      const y = rowEl ? (rowEl.offsetTop + rowEl.offsetHeight / 2) : ((day - 0.5) * 32);
       if (entry) {
         if (entry.mood !== undefined && entry.mood !== '') {
           const mVal = parseFloat(entry.mood);
@@ -1457,9 +1502,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 初期化実行 (初回データ読み込み)
   // ==========================================
   window.addEventListener('resize', () => {
-    const monthKey = getMonthKey();
-    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-    loadMonthlyRecord(monthKey).then(m => renderGraphSVG(daysInMonth, m.graph_data || {}));
+    adjustAllRowHeights();
   });
 
   async function initApp() {
