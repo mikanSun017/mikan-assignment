@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>楽々バレットジャーナル</title>
+  <title>マルっとジャーナル</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Kurenaido&display=swap" rel="stylesheet">
@@ -115,6 +115,10 @@
     .month-title-group { display: flex; align-items: baseline; gap: 15px; }
     .month-title-en { font-size: 2rem; font-weight: bold; letter-spacing: 6px; text-transform: uppercase; }
     .month-title-jp { font-size: 1.2rem; color: #666; }
+    .save-status { font-size: 0.85rem; color: #888; white-space: nowrap; transition: color 0.2s; }
+    .save-status.is-saving { color: var(--color-monthly); }
+    .save-status.is-saved { color: #5a9a42; }
+    .save-status.is-error { color: #d9534f; font-weight: bold; }
     .nav-btn {
       background: transparent; border: 1px solid var(--text-color); border-radius: 4px;
       padding: 2px 10px; font-family: var(--font-journal); font-size: 1.2rem; cursor: pointer;
@@ -191,7 +195,7 @@
     /* ==========================================
        モーダル (グラフデータ入力用)
        ========================================== */
-    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 1500; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .modal-backdrop.show { opacity: 1; pointer-events: auto; }
     .modal-card { background: var(--page-color); padding: 20px 25px; border-radius: 8px; border: 2px solid var(--text-color); box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 290px; }
     .modal-title { font-size: 1.3rem; margin-bottom: 15px; text-align: center; border-bottom: 1px dashed var(--line-color); padding-bottom: 5px; }
@@ -206,12 +210,13 @@
        Custom Log (お絵描き) 専用スタイル
        ========================================== */
     .canvas-container { display: flex; flex-direction: column; gap: 15px; margin-top: 15px; }
-    .drawing-tools { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; background: rgba(255, 255, 255, 0.6); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--line-color); }
+    .drawing-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: rgba(255, 255, 255, 0.6); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--line-color); }
     .tool-group { display: flex; align-items: center; gap: 5px; }
     .canvas-wrapper { position: relative; background-color: #ffffff; border: 1px solid var(--line-color); border-radius: 8px; box-shadow: inset 0 0 10px rgba(0,0,0,0.02); overflow: hidden; cursor: crosshair; }
     #drawing-canvas { display: block; touch-action: none; width: 100%; height: 450px; }
-    .canvas-btn { font-family: 'Zen Kurenaido', sans-serif; font-size: 1rem; padding: 5px 15px; border: 1px solid var(--text-color); background: transparent; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
-    .canvas-btn:hover { background: var(--text-color); color: var(--page-color); }
+    .canvas-btn { font-family: 'Zen Kurenaido', sans-serif; font-size: 1rem; padding: 5px 12px; border: 1px solid var(--text-color); background: transparent; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+    .canvas-btn:hover:not(:disabled) { background: var(--text-color); color: var(--page-color); }
+    .canvas-btn:disabled { opacity: 0.4; cursor: default; }
     .canvas-btn.active-tool { background: var(--color-custom); border-color: var(--color-custom); color: #333; font-weight: bold; }
 
     /* 画面幅が1400px以下でも、左に飛び出すしおり(最大95px)が画面外に切れないようにする */
@@ -219,8 +224,8 @@
       .notebook-container { margin-left: 90px; }
     }
 
-    /* 認証ゲート (匿名サインインの途中・失敗したときだけ表示) */
-    .auth-gate { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(250, 248, 243, 0.94); }
+    /* 認証ゲート (ドロワーより前面に表示するため z-index: 2000) */
+    .auth-gate { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(250, 248, 243, 0.94); }
     .auth-gate[hidden] { display: none; }
     .auth-card { width: 100%; max-width: 360px; padding: 22px 24px; text-align: center; background: #ffffff; border: 2px solid var(--text-color); border-radius: 8px; box-shadow: 4px 4px 0 rgba(0,0,0,0.15); font-family: var(--font-journal); }
     .auth-card p { margin: 0 0 14px; font-size: 1.05rem; line-height: 1.6; }
@@ -228,8 +233,8 @@
     #turnstile-box[hidden] { display: none; }
     .auth-retry-btn { margin-top: 12px; padding: 8px 18px; border: 2px solid var(--text-color); border-radius: 6px; background: var(--color-monthly); color: #ffffff; font-family: var(--font-journal); font-size: 1rem; cursor: pointer; }
     .auth-retry-btn[hidden] { display: none; }
-    /* 保存エラーなどの通知 */
-    .app-toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 1100; max-width: min(92vw, 420px); padding: 10px 16px; background: #333333; color: #ffffff; border-radius: 8px; font-size: 0.95rem; line-height: 1.5; box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+    /* 保存エラーなどの通知 (最前面 z-index: 2100) */
+    .app-toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 2100; max-width: min(92vw, 420px); padding: 10px 16px; background: #333333; color: #ffffff; border-radius: 8px; font-size: 0.95rem; line-height: 1.5; box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
     .app-toast[hidden] { display: none; }
 
     /* ==========================================
@@ -274,6 +279,7 @@
       .month-title-group { flex: 1 1 0; min-width: 0; justify-content: center; flex-wrap: nowrap; gap: 0 8px; text-align: center; }
       .month-title-en { font-size: 1.4rem; letter-spacing: 3px; }
       .month-title-jp { font-size: 1rem; white-space: nowrap; }
+      .save-status { display: none; }
 
       /* 日付ログ: 入力欄の標準幅でページが必要以上に広がらないようにする(余った幅は自動で伸びる) */
       .date-log-section { min-width: 170px; }
@@ -312,7 +318,7 @@
       .nav-btn { padding: 2px 8px; font-size: 1.1rem; }
       .month-header .tab-btn { font-size: 0.85rem; padding: 6px 10px; }
       .month-title-group { flex-direction: column; align-items: center; gap: 0; }
-      .month-title-en { font-size: clamp(1rem, calc((100vw - 201px) / 7.4), 1.4rem); letter-spacing: 0.1em; line-height: 1.15; }
+      .month-title-en { font-size: clamp(1rem, calc((100vw - 245px) / 7.4), 1.4rem); letter-spacing: 0.1em; line-height: 1.15; }
       .month-title-jp { line-height: 1.15; }
     }
   </style>
@@ -340,7 +346,9 @@
           <div class="month-title-group">
             <span id="month-title-en" class="month-title-en"></span>
             <span id="month-title-jp" class="month-title-jp"></span>
+            <span id="save-status" class="save-status" aria-live="polite"></span>
           </div>
+          <button id="today-month-btn" class="nav-btn today-btn" title="今月に戻る">今月</button>
           <button id="next-month-btn" class="nav-btn">&gt;</button>
           <button class="tab-btn timer-log" data-target="view-timer">Timer</button>
         </div>
@@ -401,7 +409,7 @@
       <button class="close-drawer-btn">×</button>
       <h2 style="font-size: 1.8rem; margin-bottom: 20px;">Future Log</h2>
       
-      <!-- 追記: Future Log のフォーム -->
+      <!-- Future Log のフォーム -->
       <form id="future-form" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
         <select id="future-month-select" class="month-select"></select>
         <div class="color-select-wrapper">
@@ -411,7 +419,7 @@
         <button type="submit" class="submit-btn future-btn">追加</button>
       </form>
       
-      <!-- 追記: Future Log のグリッド -->
+      <!-- Future Log のグリッド -->
       <div id="future-grid" class="future-grid"></div>
     </main>
 
@@ -422,10 +430,13 @@
       <button class="close-drawer-btn">×</button>
       <h2 style="font-size: 1.8rem; margin-bottom: 20px;">Daily Log</h2>
       
-      <!-- 追記: Daily Log の日付操作とフォーム -->
+      <!-- Daily Log の日付操作とフォーム -->
       <div class="daily-date-selector">
         <button id="prev-daily-btn">&lt; 前日</button>
-        <h3 id="current-daily-date"></h3>
+        <div class="daily-date-center">
+          <h3 id="current-daily-date"></h3>
+          <button id="today-daily-btn" class="today-pill-btn" title="今日に戻る">今日</button>
+        </div>
         <button id="next-daily-btn">翌日 &gt;</button>
       </div>
 
@@ -438,6 +449,10 @@
           <input type="radio" id="attr-tobe" name="attribute" value="To-be">
           <label for="attr-tobe">To-be</label>
         </div>
+        <label class="sync-monthly-option">
+          <input type="checkbox" id="sync-to-monthly-checkbox">
+          <span>Monthly TASKにも追加</span>
+        </label>
         <div class="input-group">
           <input type="text" id="journal-input" placeholder="出来事や気づきを記録..." autocomplete="off" required>
           <button type="submit" class="submit-btn">記録</button>
@@ -455,7 +470,7 @@
       <h2 style="font-size: 1.8rem; margin-bottom: 10px;">Draw Log</h2>
       
       <div class="canvas-container">
-        <div class="drawing-tools" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;">
+        <div class="drawing-tools">
           <div class="tool-group">
             <label for="pen-color">Color:</label>
             <input type="color" id="pen-color" value="#333333" class="color-picker">
@@ -464,17 +479,18 @@
             <label for="pen-width">Size:</label>
             <input type="range" id="pen-width" min="1" max="20" value="3">
           </div>
-          <button id="eraser-btn" class="canvas-btn">消しゴム</button>
-          <button id="clear-btn" class="canvas-btn" style="color: #d9534f; border-color: #d9534f;">全消去</button>
+          <button type="button" id="eraser-btn" class="canvas-btn">消しゴム</button>
+          <button type="button" id="undo-btn" class="canvas-btn" disabled title="直前の操作を取り消す">1つ戻る</button>
+          <button type="button" id="clear-btn" class="canvas-btn" style="color: #d9534f; border-color: #d9534f;">全消去</button>
           
-          <!-- 追加: 保存用カテゴリと保存ボタン -->
+          <!-- 保存用カテゴリと保存ボタン -->
           <div style="margin-left: auto; display: flex; gap: 5px;">
             <select id="canvas-category" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9rem;">
               <option value="アイデア案">アイデア案</option>
               <option value="落書き">落書き</option>
               <option value="その他">その他</option>
             </select>
-            <button id="save-canvas-btn" class="submit-btn" style="padding: 4px 12px; font-size: 0.9rem;">付箋として保存</button>
+            <button type="button" id="save-canvas-btn" class="submit-btn" style="padding: 4px 12px; font-size: 0.9rem;">付箋として保存</button>
           </div>
         </div>
         
@@ -483,7 +499,7 @@
         </div>
       </div>
 
-      <!-- 追加: 保存された付箋ギャラリー -->
+      <!-- 保存された付箋ギャラリー -->
       <div id="custom-notes-gallery" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 30px; padding-top: 20px; border-top: 1px dashed #ccc;">
         <!-- 保存した付箋がここに並びます -->
       </div>
@@ -530,7 +546,7 @@
     </main>
   </div> <!-- /.notebook-container の閉じタグ -->
 
-  <!-- 追加: ドロワー展開時の背景暗転用オーバーレイ -->
+  <!-- ドロワー展開時の背景暗転用オーバーレイ -->
   <div class="drawer-overlay" id="drawer-overlay"></div>
 
   <!-- =====================================
