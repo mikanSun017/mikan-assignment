@@ -426,6 +426,25 @@ document.addEventListener('DOMContentLoaded', () => {
   // Webフォントの読み込み後は文字の長さが変わるので、測り直す
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeaderHeight);
 
+  // 今日の行を薄い黄色にする (表示中の月が「今月」のときだけ)。
+  // 日付ログ・習慣・グラフの各行に付けた data-day を使い、3列とも同時に切り替える。
+  function applyTodayHighlight() {
+    const box = document.getElementById('date-log-rows-container');
+    if (!box || box.dataset.year === undefined) return;
+    const now = new Date();
+    const isThisMonth = Number(box.dataset.year) === now.getFullYear() && Number(box.dataset.month) === now.getMonth();
+    const today = isThisMonth ? String(now.getDate()) : null;
+    document.querySelectorAll('#view-monthly [data-day]').forEach(el => {
+      el.classList.toggle('today', el.dataset.day === today);
+    });
+  }
+  // 開きっぱなしで日付が変わっても追従する (タブに戻ったとき + 1分ごと)
+  if (!window.__todayWatch) {
+    window.__todayWatch = true;
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) applyTodayHighlight(); });
+    setInterval(applyTodayHighlight, 60 * 1000);
+  }
+
   async function renderMonthlyLog() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth(); 
@@ -451,6 +470,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!dateLogsContainer) return;
 
     dateLogsContainer.innerHTML = '';
+    dateLogsContainer.dataset.year = String(year);
+    dateLogsContainer.dataset.month = String(month);
     habitHeaderRow.innerHTML = '';
     habitRowsContainer.innerHTML = '';
 
@@ -493,6 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const dayOfWeek = dateObj.getDay(); 
       const rowDiv = document.createElement('div');
       rowDiv.className = 'date-log-row';
+      rowDiv.dataset.day = String(day);
 
       let dayClass = '';
       if (dayOfWeek === 0) dayClass = 'day-sun';
@@ -527,6 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const hRowDiv = document.createElement('div');
       hRowDiv.className = 'habit-row';
+      hRowDiv.dataset.day = String(day);
       habitItems.forEach(item => {
         const cell = document.createElement('div');
         cell.className = 'habit-cell';
@@ -550,6 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let day = 1; day <= daysInMonth; day++) {
       const gRow = document.createElement('div');
       gRow.className = 'graph-row';
+      gRow.dataset.day = String(day);
       for (let c = 0; c < 4; c++) {
         const guide = document.createElement('div');
         guide.className = 'graph-col-guide';
@@ -559,6 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
       graphBgGrid.appendChild(gRow);
     }
 
+    applyTodayHighlight();
     setTimeout(() => renderGraphSVG(daysInMonth, graphData), 50);
     renderTaskList(monthKey, taskList);
   }
